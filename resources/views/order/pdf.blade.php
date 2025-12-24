@@ -1,64 +1,33 @@
 <!DOCTYPE html>
 <html>
-
 <head>
     <meta charset="UTF-8">
     <style>
-        body {
-            font-family: DejaVu Sans;
-            font-size: 16x;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        th,
-        td {
-            border: 1px solid #ccc;
-            padding: 6px;
-            text-align: center;
-            font-size: 10px;
-        }
-
-        th {
-            background: #2C3E50;
-            color: #fff;
-        }
-
-        img {
-            max-width: 70px;
-            max-height: 70px;
-        }
-
-        .price-old,
-        .old-price {
-            text-decoration: line-through;
-            color: #888;
-            font-size: 9px;
-        }
-
-        .price-new,
-        .new-price {
-            font-weight: bold;
-            color: #0a8a0a;
-        }
-
-        .grand-total-price {
-            color: #7F8C8D
-        }
+        body {font-family: Poppins;font-size: 16x;}
+        table {width: 100%;border-collapse: collapse;}
+        th,td {border: 1px solid #ccc;padding: 6px;text-align: center;font-size: 10px;}
+        th {background: #2C3E50;color: #fff;}
+        img {max-width: 70px;max-height: 70px;}
+        .price-old,.old-price {text-decoration: line-through;color: #888;font-size: 9px;}
+        .price-new,.new-price {font-weight: bold;color: #0a8a0a;}
+        .grand-total-price {color: #7F8C8D}
     </style>
 </head>
-
 <body>
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-        <h2 style="margin: 0;">Order Details</h2>
-        <div style="font-size: 10px;">
+    <table width="100%" style="border:none;margin-bottom:10px;">
+        <tr>
+            <td style="border:none;text-align:left;vertical-align:middle;">
+                <h2 style="margin:0;">Order Details</h2>
+                <div style="font-size:10px;">
+                    Generated on: {{ now()->format('d M Y, h:i A') }}
+                </div>
+            </td>
 
-            Generated on: {{ now()->format('d M Y, h:i A') }}
-        </div>
-    </div>
+                <td style="border:none;text-align:right;vertical-align:middle;">
+                <img src="{{ public_path('assets/images/logo-xion.png') }}" width="120">
+            </td>
+        </tr>
+    </table>
     <hr style="margin: 8px 0 12px;">
     <table>
         <thead>
@@ -73,25 +42,21 @@
             </tr>
         </thead>
         <tbody>
+    
             @php $grandTotal = 0; @endphp
-
             @foreach($products as $item)
-
+            <?php echo $item; ?>
             @php
             $price = ($item->selling_price > 0 && $item->selling_price < $item->original_price)
                 ? $item->selling_price
                 : $item->original_price;
-
                 $rowTotal = $price * $item->qty;
                 $grandTotal += $rowTotal;
                 @endphp
-                {{$item}}
                 <tr>
                     <td>{{ $loop->iteration }}</td>
-                    <td>{{ $item->name }}</td>           
-                    <td>
-                        <img src="{{ $item->image_url }}" class="product-img" />
-                    </td>
+                    <td>{{ $item->image_url }}</td>
+                    <td><img src="{{ $item->image_url }}"></td>
                     <td>{{ $item->item_code }}</td>
                     <td>
                         @if($item->selling_price > 0 && $item->selling_price < $item->original_price)
@@ -99,7 +64,7 @@
                             <div class="new-price"><img src="file://{{ public_path('assets/images/Dirham-Symbol.png') }}" width="10"> {{ number_format($item->selling_price,2) }} / {{ $item->stock_unit }}</div>
                             @else
                             <div class="new-price"><img src="file://{{ public_path('assets/images/Dirham-Symbol.png') }}" width="10"> {{ number_format($item->original_price,2) }} / {{ $item->stock_unit }}</div>
-                            @endif
+                        @endif
                     </td>
                     <td>{{ $item->qty }}</td>
                     <td><img src="file://{{ public_path('assets/images/Dirham-Symbol-grey.png') }}" width="10"> {{ number_format($rowTotal,2) }}</td>

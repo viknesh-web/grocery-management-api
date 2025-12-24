@@ -125,7 +125,7 @@ class StoreProductRequest extends FormRequest
             'name' => ['required', 'string', 'min:2', 'max:255'],
             'item_code' => ['required', 'string', 'max:100', Rule::unique('products', 'item_code')],
             'category_id' => ['required', 'integer', 'exists:categories,id'],
-            'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048'],
+            'image' => ['required', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048'],
             'original_price' => ['required', 'numeric', 'min:0', 'max:999999.99'],
             'discount_type' => ['sometimes', Rule::in(['percentage', 'fixed', 'none'])],
             'discount_value' => [

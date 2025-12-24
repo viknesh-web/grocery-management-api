@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class Product extends Model
 {
@@ -136,9 +137,15 @@ class Product extends Model
         if (!$this->image) {
             return null;
         }
-        
-        return Storage::disk('media')->url($this->image);
-        
+        $imagePath = ltrim($this->image, '/');
+        Log::debug(Storage::disk('media')->url($imagePath));
+
+        // Prefer `media` disk (custom storage). If file exists there, return its URL.
+        if (Storage::disk('media')->exists($imagePath)) {
+            return Storage::disk('media')->url($imagePath);
+        }
+
+        return null;
     }
 
     /**

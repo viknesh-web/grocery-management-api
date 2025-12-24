@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Product;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class PdfService
@@ -55,15 +56,14 @@ class PdfService
             ->orderBy('name')
             ->get();
 
-        $groupedProducts = $products->groupBy('category.name');
-
         $data = [
-            'groupedProducts' => $groupedProducts,
+            'products' => $products,
             'date' => now()->format('d M Y'),
             'time' => now()->format('h:i A'),
         ];
 
-        $pdf = Pdf::loadView('pdfs.price-list', $data);
+        Log::debug('Generating PDF price list', ['count' => $products->count()]);
+        $pdf = Pdf::loadView('pdfs.generate', $data);
         $pdf->setPaper('A4', 'portrait');
 
         $disk = Storage::disk('media');

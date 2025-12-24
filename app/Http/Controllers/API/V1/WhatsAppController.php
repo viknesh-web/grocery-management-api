@@ -10,6 +10,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Log;
 
 /**
  * WhatsApp Controller
@@ -166,9 +167,64 @@ class WhatsAppController extends Controller
         $customPdfUrl = null;
         if ($pdfType === 'custom' && $request->hasFile('custom_pdf')) {
             $file = $request->file('custom_pdf');
-            $filename = 'pdfs/custom-' . date('Y-m-d-H-i-s') . '-' . uniqid() . '.pdf';
-            $path = $file->storeAs('', $filename, 'public');
+            
+            // Get original filename and extension
+            $originalName = $file->getClientOriginalName();
+            $extension = $file->getClientOriginalExtension() ?: 'pdf';
+            
+            // Sanitize filename for filesystem safety (remove path traversal attempts, etc.)
+            // Remove directory separators and null bytes
+            $safeName = str_replace(['/', '\\', "\0"], '', $originalName);
+            // Trim and normalize whitespace, replace spaces with hyphens, and remove unsafe characters
+            $safeName = trim($safeName);
+            $safeName = preg_replace('/\s+/', '-', $safeName);
+            $safeName = preg_replace('/[^A-Za-z0-9_\-\.]/', '', $safeName);
+            
+            // If no extension, ensure .pdf
+            if (!pathinfo($safeName, PATHINFO_EXTENSION)) {
+                $safeName .= '.' . $extension;
+            }
+            
+            // Use original filename with timestamp prefix to ensure uniqueness
+            $filename = date('Y-m-d_H-i-s') . '_' . $safeName;
+            $path = 'pdfs/' . $filename;
+            
+            // Store to media disk (consistent with regular PDFs)
+            $disk = \Illuminate\Support\Facades\Storage::disk('media');
+            
+            // Ensure pdfs directory exists
+            $directory = $disk->path('pdfs');
+            if (!is_dir($directory)) {
+                mkdir($directory, 0755, true);
+            }
+            
+            // Check if file already exists and append number if needed
+            $counter = 1;
+            $baseFilename = $filename;
+            while ($disk->exists($path)) {
+                $pathInfo = pathinfo($baseFilename);
+                $nameWithoutExt = $pathInfo['filename'];
+                $ext = $pathInfo['extension'] ?? 'pdf';
+                $filename = $nameWithoutExt . '_' . $counter . '.' . $ext;
+                $path = 'pdfs/' . $filename;
+                $counter++;
+            }
+            
+            // Store the file
+            $disk->put($path, file_get_contents($file->getRealPath()));
+            
+            // Verify file was stored
+            if (!$disk->exists($path)) {
+                throw new \RuntimeException('Failed to store custom PDF file');
+            }
+            
+            // Get the URL using PdfService (uses media disk)
             $customPdfUrl = $this->pdfService->getPdfUrl($path);
+            // Ensure URL has no surrounding whitespace and encode spaces
+            if (!empty($customPdfUrl)) {
+                $customPdfUrl = trim($customPdfUrl);
+                $customPdfUrl = str_replace(' ', '%20', $customPdfUrl);
+            }
         }
 
         // Validate that template_id and message are not both provided
@@ -182,6 +238,7 @@ class WhatsAppController extends Controller
             ], 422);
         }
 
+        Log::debug('customPdfUrl: ' . ($customPdfUrl ?? 'null'));
         $results = $this->whatsAppService->sendPriceListToCustomers(
             $customerIds,
             $message,

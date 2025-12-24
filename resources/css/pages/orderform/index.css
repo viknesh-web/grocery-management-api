@@ -1,0 +1,115 @@
+@font-face {
+    font-family: 'Poppins-Regular';
+    src: url('../../../fonts/Poppins-Regular.eot') format('eot');
+    src: url('../../../fonts/Poppins-Regular.svg') format('svg');
+    src: url('../../../fonts/Poppins-Regular.ttf') format('ttf');
+    src: url('../../../fonts/Poppins-Regular.woff') format('woff');
+    src: url('../../../fonts/Poppins-Regular.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'Poppins-Bold';
+    src: url('../../../fonts/Poppins-Bold.eot') format('eot');
+    src: url('../../../fonts/Poppins-Bold.svg') format('svg');
+    src: url('../../../fonts/Poppins-Bold.ttf') format('ttf');
+    src: url('../../../fonts/Poppins-Bold.woff') format('woff');
+    src: url('../../../fonts/Poppins-Bold.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'Poppins-SemiBold';
+    src: url('../../../fonts/Poppins-SemiBold.eot') format('eot');
+    src: url('../../../fonts/Poppins-SemiBold.svg') format('svg');
+    src: url('../../../fonts/Poppins-SemiBold.ttf') format('ttf');
+    src: url('../../../fonts/Poppins-SemiBold.woff') format('woff');
+    src: url('../../../fonts/Poppins-SemiBold.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'Poppins-Medium';
+    src: url('../../../fonts/Poppins-Medium.eot') format('eot');
+    src: url('../../../fonts/Poppins-Medium.svg') format('svg');
+    src: url('../../../fonts/Poppins-Medium.ttf') format('ttf');
+    src: url('../../../fonts/Poppins-Medium.woff') format('woff');
+    src: url('../../../fonts/Poppins-Medium.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'Roboto-Regular';
+    src: url('../../../fonts/Roboto-Regular.eot') format('eot');
+    src: url('../../../fonts/Roboto-Regular.svg') format('svg');
+    src: url('../../../fonts/Roboto-Regular.ttf') format('ttf');
+    src: url('../../../fonts/Roboto-Regular.woff') format('woff');
+    src: url('../../../fonts/Roboto-Regular.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'Roboto-Bold';
+    src: url('../../../fonts/Roboto-Bold.eot') format('eot');
+    src: url('../../../fonts/Roboto-Bold.svg') format('svg');
+    src: url('../../../fonts/Roboto-Bold.ttf') format('ttf');
+    src: url('../../../fonts/Roboto-Bold.woff') format('woff');
+    src: url('../../../fonts/Roboto-Bold.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'Roboto-SemiBold';
+    src: url('../../../fonts/Roboto-SemiBold.eot') format('eot');
+    src: url('../../../fonts/Roboto-SemiBold.svg') format('svg');
+    src: url('../../../fonts/Roboto-SemiBold.ttf') format('ttf');
+    src: url('../../../fonts/Roboto-SemiBold.woff') format('woff');
+    src: url('../../../fonts/Roboto-SemiBold.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'Roboto-Medium';
+    src: url('../../../fonts/Roboto-Medium.eot') format('eot');
+    src: url('../../../fonts/Roboto-Medium.svg') format('svg');
+    src: url('../../../fonts/Roboto-Medium.ttf') format('ttf');
+    src: url('../../../fonts/Roboto-Medium.woff') format('woff');
+    src: url('../../../fonts/Roboto-Medium.woff2') format('woff2');
+}
+
+.order-wrapper {width: 85%;margin: auto; border: 1px solid #ddd;padding: 20px;}
+#categoryFilter {padding: 8px 16px;border-radius: 6px;background: #3DA222;color: #fff; border: none;cursor: pointer;}
+.tables-wrapper {display: flex;gap: 20px;}
+.table-box {width: 50%;border: 1px solid #ddd;background: #fff;}
+.table-scroll { max-height: 75vh;overflow-y: auto;}
+table {width: 100%;border-collapse: collapse;table-layout: fixed;text-align: center;}
+th {background: #2C3E50;color: #fff;padding: 12px;position: sticky;top: 0; z-index: 2; font-family: 'Roboto-Medium';}
+td {border: 1px solid #ddd;padding: 6px;font-size: 14px;font-family: 'Poppins-Regular';}
+col.img { width: 80px; }
+col.name { width: 120px; }
+col.code { width: 80px;}
+col.price { width: 100px; }
+col.qty { width: 80px; }
+col.total { width: 80px; }
+.product-image img {width: 100%;height: 60px;object-fit: cover;}
+.qty {width: 55px;text-align: center;}
+.selling-price {font-weight: bold;color: #3DA222;}
+.grand-total {margin-top: 15px;font-size: 18px;text-align: right;font-weight: bold;}
+.submit {display: block;margin: 25px auto;padding: 10px 24px;background: #3DA222;color: #fff;border: none;border-radius: 8px;cursor: pointer;}
+.submit:disabled {opacity: 0.5;cursor: not-allowed;}
+.original-price {font-size: 12px;color: #999;display: inline-flex;align-items: center;gap: 4px;text-decoration-line: line-through;text-decoration-thickness: 1px;text-decoration-color: #999;line-height: 1.4;}
+.item-code{word-wrap: break-word;}
+.header{display: inline-block;}
+@media (max-width: 1320px) {
+    .tables-wrapper {flex-direction: column;gap: 0;}    
+    .table-box:last-child {display: none;}
+    .order-wrapper {width: 95%;padding-top: 20px;}
+    .order-wrapper > div:first-child {flex-direction: column;gap: 15px;text-align: center !important;}
+    .header {margin-left: 0 !important;}
+    .filter-bar {text-align: center !important;}
+    #categoryFilter {margin-right: 0 !important;}
+}
+@media (max-width: 768px) {
+    .grand-total,.tables-wrapper{width:98% !important;}
+    .table-box {width: 97% !important;}
+    .order-wrapper {width: 100%;padding: 15px;}
+    table {font-size: 12px;}
+    th, td {padding: 8px 4px;}
+    .product-image img {width: 60px;height: 50px;}
+    .qty {width: 45px;}
+    col.name {width: 100px;}
+    col.code {width: 70px;}
+    col.price {width: 90px;}
+}
+@media (max-width: 1320px) {
+    .table-scroll {max-height: 72vh;}
+}
+@media (max-width: 600px) {
+    .table-scroll {max-height: 80vh;}
+}

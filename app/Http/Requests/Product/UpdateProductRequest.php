@@ -129,7 +129,7 @@ class UpdateProductRequest extends FormRequest
             'name' => ['sometimes', 'required', 'string', 'min:2', 'max:255'],
             'item_code' => ['sometimes', 'required', 'string', 'max:100', Rule::unique('products', 'item_code')->ignore($productId)],
             'category_id' => ['sometimes', 'nullable', 'integer', 'exists:categories,id'],
-            'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048'],
+            'image' => ['required', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048'],
             'image_removed' => ['sometimes', 'boolean'],
             'original_price' => ['sometimes', 'required', 'numeric', 'min:0', 'max:999999.99'],
             'discount_type' => ['sometimes', Rule::in(['percentage', 'fixed', 'none'])],
