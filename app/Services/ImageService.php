@@ -131,7 +131,7 @@ class ImageService
             throw new \RuntimeException('Category image was not saved correctly');
         }
 
-        return $filename;
+        return $path;
     }
 
     public function deleteProductImage(string $imagePath): bool
@@ -149,7 +149,11 @@ class ImageService
         if (!$imagePath) {
             return false;
         }
-        $path = 'category/' . ltrim($imagePath, '/');
+        $normalized = ltrim($imagePath, '/');
+        // If imagePath already contains the category prefix, remove it
+        $normalized = preg_replace('#^category/#i', '', $normalized);
+        $path = 'category/' . $normalized;
+
         return Storage::disk('media')->exists($path)
             ? Storage::disk('media')->delete($path)
             : false;
@@ -157,9 +161,11 @@ class ImageService
 
     public function getImageUrl(?string $imagePath): ?string
     {
-        return $imagePath
-            ? asset('storage/' . $imagePath)
-            : null;
+        if (!$imagePath) {
+            return null;
+        }
+
+        return Storage::disk('media')->url(ltrim($imagePath, '/'));
     }
 }
 

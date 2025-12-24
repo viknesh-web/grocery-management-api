@@ -43,17 +43,46 @@ class StoreCustomerRequest extends FormRequest
             // Remove spaces, dashes, and other formatting
             $whatsappNumber = preg_replace('/[\s\-\(\)]/', '', $whatsappNumber);
             
-            // Add + if not present and starts with country code
+            // Get valid country codes from environment
+            $validCodes = array_map('trim', array_filter(explode(',', env('VITE_VALID_COUNTRY_CODES', 'UAE,IN'))));
+            $validCodes = array_map('strtoupper', $validCodes);
+            
+            // Add + if not present
             if (!str_starts_with($whatsappNumber, '+')) {
-                // If starts with 91 (India), add +
-                if (str_starts_with($whatsappNumber, '91')) {
+                // If starts with 971 (UAE), add +
+                if (str_starts_with($whatsappNumber, '971')) {
                     $whatsappNumber = '+' . $whatsappNumber;
-                } elseif (str_starts_with($whatsappNumber, '0')) {
-                    // Remove leading 0 and add +91
-                    $whatsappNumber = '+91' . substr($whatsappNumber, 1);
-                } else {
-                    // Assume Indian number, add +91
-                    $whatsappNumber = '+91' . $whatsappNumber;
+                }
+                // If starts with 91 (India), add +
+                elseif (str_starts_with($whatsappNumber, '91')) {
+                    $whatsappNumber = '+' . $whatsappNumber;
+                }
+                // If starts with 0, determine country code based on valid codes
+                elseif (str_starts_with($whatsappNumber, '0')) {
+                    if (in_array('IN', $validCodes)) {
+                        // Remove leading 0 and add +91 for India
+                        $whatsappNumber = '+91' . substr($whatsappNumber, 1);
+                    } elseif (in_array('UAE', $validCodes)) {
+                        // Remove leading 0 and add +971 for UAE (if number format suggests UAE)
+                        $whatsappNumber = '+971' . substr($whatsappNumber, 1);
+                    } else {
+                        // Default to India if not specified
+                        $whatsappNumber = '+91' . substr($whatsappNumber, 1);
+                    }
+                }
+                // If no country code prefix, determine based on length and valid codes
+                else {
+                    // 10 digits likely India, 9 digits likely UAE
+                    if (strlen($whatsappNumber) === 10 && in_array('IN', $validCodes)) {
+                        $whatsappNumber = '+91' . $whatsappNumber;
+                    } elseif (strlen($whatsappNumber) === 9 && in_array('UAE', $validCodes)) {
+                        $whatsappNumber = '+971' . $whatsappNumber;
+                    } elseif (in_array('IN', $validCodes)) {
+                        // Default to India if both are valid, prefer India
+                        $whatsappNumber = '+91' . $whatsappNumber;
+                    } elseif (in_array('UAE', $validCodes)) {
+                        $whatsappNumber = '+971' . $whatsappNumber;
+                    }
                 }
             }
             
@@ -61,12 +90,19 @@ class StoreCustomerRequest extends FormRequest
         }
 
         // Normalize address/area
-        if ($this->has('address') && $this->address !== null && $this->address !== '') {
-            $dataToMerge['address'] = trim((string) $this->address);
+        // Always accept both address and area fields regardless of feature flag
+        if ($this->has('address')) {
+            $addressValue = $this->input('address');
+            $dataToMerge['address'] = ($addressValue !== null && $addressValue !== '') 
+                ? trim((string) $addressValue) 
+                : null;
         }
 
-        if ($this->has('area') && $this->area !== null && $this->area !== '') {
-            $dataToMerge['area'] = trim((string) $this->area);
+        if ($this->has('area')) {
+            $areaValue = $this->input('area');
+            $dataToMerge['area'] = ($areaValue !== null && $areaValue !== '') 
+                ? trim((string) $areaValue) 
+                : null;
         }
 
         // Normalize landmark
@@ -98,25 +134,54 @@ class StoreCustomerRequest extends FormRequest
      */
     public function rules(): array
     {
+        // Get valid country codes from environment
+        $validCodes = array_map('trim', array_filter(explode(',', env('VITE_VALID_COUNTRY_CODES', 'UAE,IN'))));
+        $validCodes = array_map('strtoupper', $validCodes);
+        
+        // Build phone validation regex based on valid country codes
+        $phoneRegexPatterns = [];
+        if (in_array('UAE', $validCodes)) {
+            // UAE: +971 followed by 2,3,4,6,7,9 or 50,52,54,55,56,58, then 7 more digits
+            $phoneRegexPatterns[] = '\+971(2|3|4|6|7|9|50|52|54|55|56|58)\d{7}';
+        }
+        if (in_array('IN', $validCodes)) {
+            // India: +91 followed by 6-9, then 9 more digits (total 10 digits)
+            $phoneRegexPatterns[] = '\+91[6-9]\d{9}';
+        }
+        
+        // If no valid codes specified, default to both
+        if (empty($phoneRegexPatterns)) {
+            $phoneRegexPatterns[] = '\+971(2|3|4|6|7|9|50|52|54|55|56|58)\d{7}';
+            $phoneRegexPatterns[] = '\+91[6-9]\d{9}';
+        }
+        
+        // Combine patterns with OR
+        $phoneRegex = '/^(' . implode('|', $phoneRegexPatterns) . ')$/';
+        
+        // Build error message
+        $errorMessages = [];
+        if (in_array('UAE', $validCodes) || empty($validCodes)) {
+            $errorMessages[] = 'UAE (+971XXXXXXXXX)';
+        }
+        if (in_array('IN', $validCodes) || empty($validCodes)) {
+            $errorMessages[] = 'India (+91XXXXXXXXXX)';
+        }
+        $phoneErrorMsg = 'The phone number must be a valid ' . implode(' or ', $errorMessages) . ' format.';
+
         $rules = [
             'name' => ['required', 'string', 'max:255', 'min:2'],
             'whatsapp_number' => [
                 'required',
                 'string',
-                'regex:/^\+971(2|3|4|6|7|9|50|52|54|55|56|58)\d{7}$/',
                 'unique:customers,whatsapp_number',
             ],
             'landmark' => ['nullable', 'string', 'max:255'],
             'remarks' => ['nullable', 'string', 'max:1000'],
             'active' => ['sometimes', 'boolean'],
+            // Always accept both address and area fields
+            'address' => ['nullable', 'string', 'max:1000'],
+            'area' => ['nullable', 'string', 'max:255'],
         ];
-
-        // Conditionally add address or area field based on feature flag
-        if (config('features.address_field')) {
-            $rules['area'] = ['nullable', 'string', 'max:255'];
-        } else {
-            $rules['address'] = ['nullable', 'string', 'max:1000'];
-        }
 
         return $rules;
     }
