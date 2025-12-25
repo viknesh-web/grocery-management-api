@@ -95,6 +95,16 @@
                     </div>
                 </div>
             </div>
+            <div id="noProductsMsg" style="
+    display:none;
+    text-align:center;
+    padding:40px;
+    font-size:16px;
+    color:#6b7280;
+    font-weight:500;
+">
+                No products found.
+            </div>
             <!-- GRAND TOTAL -->
             <table style="margin-top:10px;" class="grand-total">
                 <tfoot>
@@ -104,6 +114,10 @@
                     </tr>
                 </tfoot>
             </table>
+            <div id="qtyError" style="display:none; color:#dc2626; margin-bottom:10px; font-weight:600;">
+                Please select at least one product quantity before reviewing the order.
+            </div>
+
             <button type="submit" formaction="{{ route('order.review') }}" class="submit" id="reviewBtn">
                 Review Order
             </button>
@@ -111,9 +125,7 @@
     </div>
     <table style="display:none">
         <tbody id="allProducts">
-
             @foreach($products as $product)
-        
             @php $price = $product->selling_price ?? $product->original_price; @endphp
             <tr data-category="{{ $product->category_id }}">
                 <td class="product-image">
@@ -157,5 +169,7 @@
         </tbody>
     </table>
     @vite(['resources/js/pages/orderform/index.js'])
+
 </body>
+
 </html>

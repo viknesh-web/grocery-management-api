@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\PriceUpdate;
 use App\Models\Product;
 use App\Models\ProductVariation;
 use App\Repositories\Contracts\ProductRepositoryInterface;
@@ -80,11 +81,14 @@ class ProductService
             if (($data['discount_type'] ?? 'none') === 'none') {
                 $data['discount_value'] = null;
             }
-
+            
             $data['created_by'] = $userId;
             $data['updated_by'] = $userId;
 
             $product = $this->repository->create($data);
+
+            // Create price update record for new product
+            $this->createPriceUpdateRecord($product, null, $data, $userId);
 
             // Handle variations if provided
             if (isset($data['variations']) && is_array($data['variations'])) {
@@ -113,7 +117,33 @@ class ProductService
     {
         DB::beginTransaction();
         try {
-            // Handle image upload
+            // Store old values before update
+            $oldValues = [
+                'original_price' => $product->original_price,
+                'discount_type' => $product->discount_type,
+                'discount_value' => $product->discount_value,
+                'stock_quantity' => $product->stock_quantity,
+            ];
+
+            // Check if price-related fields changed
+            $priceChanged = false;
+
+            if (array_key_exists('original_price', $data) && (float) $data['original_price'] !== (float) $product->original_price) {
+                $priceChanged = true;
+            }
+
+            if (array_key_exists('discount_type', $data) && $data['discount_type'] !== $product->discount_type) {
+                $priceChanged = true;
+            }
+
+            if (array_key_exists('discount_value', $data) && (float) $data['discount_value'] !== (float) $product->discount_value) {
+                $priceChanged = true;
+            }
+
+            if (array_key_exists('stock_quantity', $data) && (float) $data['stock_quantity'] !== (float) $product->stock_quantity) {
+                $priceChanged = true;
+            }
+
             if ($image) {
                 // Delete old image if exists
                 if ($product->image) {
@@ -137,6 +167,22 @@ class ProductService
 
             $this->repository->update($product, $data);
 
+            // Refresh product to get updated values
+            $product->refresh();
+
+            // Create price update record if price-related fields changed
+            if ($priceChanged) {
+                // Get final new values (from data or old values if not changed)
+                // Note: discount_value is already cleared in $data if discount_type is 'none'
+                $finalNewData = [
+                    'original_price' => $data['original_price'] ?? $oldValues['original_price'],
+                    'discount_type' => $data['discount_type'] ?? $oldValues['discount_type'],
+                    'discount_value' => array_key_exists('discount_value', $data) ? $data['discount_value'] : $oldValues['discount_value'],
+                    'stock_quantity' => $data['stock_quantity'] ?? $oldValues['stock_quantity'],
+                ];
+                $this->createPriceUpdateRecord($product, $oldValues, $finalNewData, $userId);
+            }
+
             // Handle variations if provided
             if (isset($data['variations']) && is_array($data['variations'])) {
                 // Delete existing variations
@@ -144,8 +190,6 @@ class ProductService
                 // Create new variations
                 $this->createVariations($product, $data['variations']);
             }
-
-            $product->refresh();
 
             DB::commit();
             return $product->load('variations');
@@ -236,6 +280,71 @@ class ProductService
         // Format: ITEMCODE-QUANTITYUNIT (e.g., CAR-001-1KG, RICE-500GM)
         $quantityStr = $quantity == (int) $quantity ? (int) $quantity : number_format($quantity, 2, '', '');
         return strtoupper($itemCode . '-' . $quantityStr . $unit);
+    }
+
+    /**
+     * Create a price update record.
+     *
+     * @param Product $product
+     * @param array|null $oldValues Old values from product (null for create)
+     * @param array $newData New values being set
+     * @param int $userId
+     * @return void
+     */
+    private function createPriceUpdateRecord(Product $product, ?array $oldValues, array $newData, int $userId): void
+    {
+        // Determine old values
+        $oldOriginalPrice = $oldValues['original_price'] ?? null;
+        $oldDiscountType = $oldValues['discount_type'] ?? null;
+        $oldDiscountValue = $oldValues['discount_value'] ?? null;
+        $oldStockQuantity = $oldValues['stock_quantity'] ?? null;
+
+        // Determine new values (from newData, which should contain the final values)
+        $newOriginalPrice = $newData['original_price'] ?? null;
+        $newDiscountType = $newData['discount_type'] ?? 'none';
+        $newDiscountValue = $newData['discount_value'] ?? null;
+        $newStockQuantity = $newData['stock_quantity'] ?? null;
+
+        // Calculate new selling price
+        $newSellingPrice = $this->calculateSellingPrice($newOriginalPrice, $newDiscountType, $newDiscountValue);
+
+        PriceUpdate::create([
+            'product_id' => $product->id,
+            'old_original_price' => $oldOriginalPrice,
+            'new_original_price' => $newOriginalPrice,
+            'old_discount_type' => $oldDiscountType,
+            'new_discount_type' => $newDiscountType,
+            'old_discount_value' => $oldDiscountValue,
+            'new_discount_value' => $newDiscountValue,
+            'old_stock_quantity' => $oldStockQuantity,
+            'new_stock_quantity' => $newStockQuantity,
+            'new_selling_price' => $newSellingPrice,
+            'updated_by' => $userId,
+        ]);
+    }
+
+    /**
+     * Calculate selling price based on original price, discount type, and discount value.
+     *
+     * @param float $originalPrice
+     * @param string $discountType
+     * @param float|null $discountValue
+     * @return float
+     */
+    private function calculateSellingPrice(float $originalPrice, string $discountType, ?float $discountValue): float
+    {
+        if ($discountType === 'none' || !$discountValue || $discountValue <= 0) {
+            return round((float) $originalPrice, 2);
+        }
+
+        if ($discountType === 'percentage') {
+            $discountAmount = $originalPrice * ($discountValue / 100);
+            $sellingPrice = $originalPrice - $discountAmount;
+        } else { // fixed
+            $sellingPrice = $originalPrice - $discountValue;
+        }
+
+        return max(0, round((float) $sellingPrice, 2));
     }
 }
 

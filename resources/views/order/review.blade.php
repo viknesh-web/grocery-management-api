@@ -3,13 +3,14 @@
 <head>
     <title>Review Order</title>
     <meta charset="utf-8">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
 </head>
 <body>
     @vite(['resources/css/pages/review/index.css'])
     <div class="container">
         <div>
-                <div class="" style="text-align: left ; margin-left: 20px;">
-                <img src="{{ asset('assets/images/logo-xion.png') }}" alt="Xion Logo" style="max-width:150px;margin:auto;display:block;">
+            <div class="" style="text-align: left ; margin-left: 20px;">
+                <img src="{{  asset('assets/images/logo-xion.png') }}" alt="Xion Logo" style="max-width:150px;margin:auto;display:block;">
             </div>
             <h2>Review Your Order</h2>
         </div>
@@ -26,7 +27,6 @@
                 </tr>
             </thead>
             <tbody>
-
                 @php $grandTotal = 0; @endphp
                 @foreach($products as $product)
                 @php
@@ -39,7 +39,7 @@
                 <tr>
                     <td>{{ $loop->iteration }}</td>
                     <td>
-                        <img src='{{ $product->image_url }}' class="product-img">
+                        <img src="{{ $product->image_url }}" class="product-img">
                     </td>
                     <td>{{ $product->name }}</td>
                     <td>{{ $product->item_code }}</td>
@@ -82,34 +82,36 @@
         </div>
     </div>
     <!-- ORDER MODAL -->
-    <div id="orderModal" class="modal-overlay">
+    <div id="orderModal" class="modal-overlay" data-submit-url="{{ route('order.confirmation') }}">
         <div class="modal-box">
             <h3>Customer Details</h3>
-
             <form method="POST" action="{{ route('order.confirmation') }}">
                 @csrf
                 <div class="form-group">
                     <label>Name</label>
-                    <input type="text" name="customer_name" value="{{ old('customer_name') }}" required>
+                    <input type="text" name="customer_name" oninput="this.value = this.value.replace(/[^a-zA-Z\s]/g, '')" value="{{ old('customer_name') }}" required>
                 </div>
                 <div class="form-group">
                     <label>WhatsApp Number</label>
-                    <input type="text" name="whatsapp" value="{{ old('whatsapp') }}" required>
+                    <input type="text" name="whatsapp" oninput="this.value = this.value.replace(/[^0-9+\-\s]/g, '')" value="{{ old('whatsapp') }}" required>
                 </div>
                 <div class="form-group">
                     <label>Email</label>
                     <input type="email" name="email" value="{{ old('email') }}">
                 </div>
-                <div class="form-group">
-                    <label>Address</label>
-                    <textarea name="address" rows="3" required>{{ old('address') }}</textarea>
+                <div class="form-group" style="position:relative;">
+                    <label>Address (Dubai only)</label>
+                    <input type="text" id="addressInput" name="address" autocomplete="off" placeholder="Start typing Dubai address"
+                        value="{{ old('address') }}">
+                    <ul id="addressSuggestions" class="address-dropdown"></ul>
                 </div>
                 <!-- Pass Grand Total -->
                 <input type="hidden" name="grand_total" value="{{ $grandTotal }}">
                 <div class="modal-actions">
                     <button type="button" class="btn btn-back" onclick="closeOrderModal()">Cancel</button>
-                    <button type="submit" class="btn btn-download">Submit Order</button>
+                    <button type="button" class="btn btn-download" onclick="submitOrderAjax()">Submit Order</button>
                 </div>
+                <div id="formErrors" class="alert alert-danger"></div>
             </form>
         </div>
     </div>

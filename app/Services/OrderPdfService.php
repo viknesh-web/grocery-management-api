@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Product;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\Log;
 
 class OrderPdfService
 {
@@ -34,11 +35,11 @@ class OrderPdfService
                 $products = collect($productsInput);
             }
         }
-
         // 4) Validate
         if ($products->isEmpty()) {
             abort(400, 'No products to generate PDF');
         }
+
 
         // 5) Render PDF using existing `pdf` view
         $pdf = Pdf::loadView('order.pdf', ['products' => $products]);

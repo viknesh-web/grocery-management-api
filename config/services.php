@@ -41,5 +41,8 @@ return [
         'whatsapp_number' => env('TWILIO_WHATSAPP_FROM'),
         'default_message' => env('TWILIO_DEFAULT_MESSAGE', 'Hello {{name}}, here is today\'s price list.'),
     ],
+    'geoapify' => [
+        'key' => env('GEOAPIFY_API_KEY'),
+    ],
 
 ];

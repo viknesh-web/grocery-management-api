@@ -106,9 +106,6 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::post('/whatsapp/validate-number', [WhatsAppController::class, 'validateNumber']);
 
 });
-Route::get('/order-form', [OrderFormController::class, 'show']) ->name('order.form');
-Route::post('/order-form/pdf', [OrderFormController::class, 'downloadPdf']) ->name('order.pdf');
-Route::post('/order-review', [OrderFormController::class, 'review'])->name('order.review');
-Route::post('/order/confirmation', [OrderFormController::class, 'confirm'])->name('order.confirmation');
+// Order form routes are handled by web routes (routes/web.php)
 
 

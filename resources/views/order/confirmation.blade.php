@@ -33,6 +33,6 @@
         </p>
     </div>
     <div class="confirmation-submit">
-        <a href="{{ route('order.form') }}" class="">Review Order</a>
+        <a href="{{ route('order.form') }}" class=""> Order Again </a>
     </div>    
 </div>
