@@ -45,46 +45,24 @@ class UpdateCustomerRequest extends FormRequest
             // Remove spaces, dashes, and other formatting
             $whatsappNumber = preg_replace('/[\s\-\(\)]/', '', $whatsappNumber);
             
-            // Get valid country codes from environment
-            $validCodes = array_map('trim', array_filter(explode(',', env('VITE_VALID_COUNTRY_CODES', 'UAE,IN'))));
-            $validCodes = array_map('strtoupper', $validCodes);
+            // Get validation country from config (default: IN)
+            $validationCountry = strtoupper(config('phone.validation_country', 'IN'));
+            $countryRules = config("phone.rules.{$validationCountry}", config('phone.rules.IN'));
+            $countryCode = $countryRules['country_code'];
             
             // Add + if not present
             if (!str_starts_with($whatsappNumber, '+')) {
-                // If starts with 971 (UAE), add +
-                if (str_starts_with($whatsappNumber, '971')) {
+                // If starts with country code without +, add +
+                if (str_starts_with($whatsappNumber, ltrim($countryCode, '+'))) {
                     $whatsappNumber = '+' . $whatsappNumber;
                 }
-                // If starts with 91 (India), add +
-                elseif (str_starts_with($whatsappNumber, '91')) {
-                    $whatsappNumber = '+' . $whatsappNumber;
-                }
-                // If starts with 0, determine country code based on valid codes
+                // If starts with 0, remove leading 0 and add country code
                 elseif (str_starts_with($whatsappNumber, '0')) {
-                    if (in_array('IN', $validCodes)) {
-                        // Remove leading 0 and add +91 for India
-                        $whatsappNumber = '+91' . substr($whatsappNumber, 1);
-                    } elseif (in_array('UAE', $validCodes)) {
-                        // Remove leading 0 and add +971 for UAE (if number format suggests UAE)
-                        $whatsappNumber = '+971' . substr($whatsappNumber, 1);
-                    } else {
-                        // Default to India if not specified
-                        $whatsappNumber = '+91' . substr($whatsappNumber, 1);
-                    }
+                    $whatsappNumber = $countryCode . substr($whatsappNumber, 1);
                 }
-                // If no country code prefix, determine based on length and valid codes
+                // If no country code prefix, add country code
                 else {
-                    // 10 digits likely India, 9 digits likely UAE
-                    if (strlen($whatsappNumber) === 10 && in_array('IN', $validCodes)) {
-                        $whatsappNumber = '+91' . $whatsappNumber;
-                    } elseif (strlen($whatsappNumber) === 9 && in_array('UAE', $validCodes)) {
-                        $whatsappNumber = '+971' . $whatsappNumber;
-                    } elseif (in_array('IN', $validCodes)) {
-                        // Default to India if both are valid, prefer India
-                        $whatsappNumber = '+91' . $whatsappNumber;
-                    } elseif (in_array('UAE', $validCodes)) {
-                        $whatsappNumber = '+971' . $whatsappNumber;
-                    }
+                    $whatsappNumber = $countryCode . $whatsappNumber;
                 }
             }
             
@@ -141,36 +119,24 @@ class UpdateCustomerRequest extends FormRequest
     {
         $customerId = $this->route('customer')?->id ?? $this->input('id');
 
-        // Get valid country codes from environment
-        $validCodes = array_map('trim', array_filter(explode(',', env('VITE_VALID_COUNTRY_CODES', 'UAE,IN'))));
-        $validCodes = array_map('strtoupper', $validCodes);
-        
-        // Build phone validation regex based on valid country codes
-        $phoneRegexPatterns = [];
-        if (in_array('UAE', $validCodes)) {
-            // UAE: +971 followed by 2,3,4,6,7,9 or 50,52,54,55,56,58, then 7 more digits
-            $phoneRegexPatterns[] = '\+971(2|3|4|6|7|9|50|52|54|55|56|58)\d{7}';
-        }
-        if (in_array('IN', $validCodes)) {
-            // India: +91 followed by 6-9, then 9 more digits (total 10 digits)
-            $phoneRegexPatterns[] = '\+91[6-9]\d{9}';
-        }
-        
-        // If no valid codes specified, default to both
-        if (empty($phoneRegexPatterns)) {
-            $phoneRegexPatterns[] = '\+971(2|3|4|6|7|9|50|52|54|55|56|58)\d{7}';
-            $phoneRegexPatterns[] = '\+91[6-9]\d{9}';
-        }
-        
-        // Combine patterns with OR
-        $phoneRegex = '/^(' . implode('|', $phoneRegexPatterns) . ')$/';
+        // Get validation country from config (default: IN)
+        $validationCountry = strtoupper(config('phone.validation_country', 'IN'));
+        $countryRules = config("phone.rules.{$validationCountry}", config('phone.rules.IN'));
 
         $rules = [
-            'name' => ['sometimes', 'required', 'string', 'max:255', 'min:2'],
+            'name' => [
+                'sometimes',
+                'required',
+                'string',
+                'min:2',
+                'max:100',
+                'regex:/^[a-zA-Z\s\-\']+$/',
+            ],
             'whatsapp_number' => [
                 'sometimes',
                 'required',
                 'string',
+                'regex:' . $countryRules['regex'],
                 Rule::unique('customers', 'whatsapp_number')->ignore($customerId),
             ],
             'landmark' => ['nullable', 'string', 'max:255'],
@@ -182,6 +148,22 @@ class UpdateCustomerRequest extends FormRequest
         ];
 
         return $rules;
+    }
+
+    /**
+     * Get custom error messages for validation rules.
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        $validationCountry = strtoupper(config('phone.validation_country', 'IN'));
+        $countryRules = config("phone.rules.{$validationCountry}", config('phone.rules.IN'));
+        
+        return [
+            'whatsapp_number.regex' => $countryRules['error_message'],
+            'name.regex' => 'Please enter a valid name (2-100 characters, letters only)',
+        ];
     }
 }
 
