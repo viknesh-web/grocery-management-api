@@ -62,11 +62,7 @@
     src: url('../../../fonts/Roboto-Medium.woff') format('woff');
     src: url('../../../fonts/Roboto-Medium.woff2') format('woff2');
 }
-<<<<<<< HEAD
-
-=======
  
->>>>>>> cf6fc85879ae5e23d55d4613b5cb8c45b5c2b7ac
 .order-wrapper {width: 85%;margin: auto; border: 1px solid #ddd;padding: 20px;}
 #categoryFilter {padding: 8px 16px;border-radius: 6px;background: #3DA222;color: #fff; border: none;cursor: pointer;}
 .tables-wrapper {display: flex;gap: 20px;}
