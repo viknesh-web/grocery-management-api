@@ -43,7 +43,7 @@ class PdfService
     //     return $filename;
     // }
 
-    public function generatePriceList(array $productIds = []): string
+    public function generatePriceList(array $productIds = [], string $pdfLayout = 'regular'): string
     {
         $query = Product::enabled()->with('category');
 
@@ -56,14 +56,25 @@ class PdfService
             ->orderBy('name')
             ->get();
 
-        $data = [
-            'products' => $products,
-            'date' => now()->format('d M Y'),
-            'time' => now()->format('h:i A'),
-        ];
+        // Determine which blade template to use based on layout
+        $viewName = ($pdfLayout === 'catalog') ? 'pdfs.catalog-price-list' : 'pdfs.generate';
 
-        Log::debug('Generating PDF price list', ['count' => $products->count()]);
-        $pdf = Pdf::loadView('pdfs.generate', $data);
+        // Prepare data based on layout
+        if ($pdfLayout === 'catalog') {
+            $data = [
+                'products' => $products,
+                'generatedAt' => now(),
+            ];
+        } else {
+            $data = [
+                'products' => $products,
+                'date' => now()->format('d M Y'),
+                'time' => now()->format('h:i A'),
+            ];
+        }
+Log::debug($products);
+        Log::debug('Generating PDF price list', ['count' => $products->count(), 'layout' => $pdfLayout]);
+        $pdf = Pdf::loadView($viewName, $data);
         $pdf->setPaper('A4', 'portrait');
 
         $disk = Storage::disk('media');

@@ -50,9 +50,16 @@ class WhatsAppController extends Controller
      */
     public function generatePriceList(Request $request): JsonResponse
     {
-        $productIds = $request->get('product_ids', []);
+        $request->validate([
+            'product_ids' => ['sometimes', 'array'],
+            'product_ids.*' => ['required', 'integer', 'exists:products,id'],
+            'pdf_layout' => ['sometimes', 'string', 'in:regular,catalog'],
+        ]);
 
-        $pdfPath = $this->pdfService->generatePriceList($productIds);
+        $productIds = $request->get('product_ids', []);
+        $pdfLayout = $request->get('pdf_layout', 'regular');
+
+        $pdfPath = $this->pdfService->generatePriceList($productIds, $pdfLayout);
         $pdfUrl = $this->pdfService->getPdfUrl($pdfPath);
 
         return response()->json([
