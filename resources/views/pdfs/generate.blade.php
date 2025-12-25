@@ -13,6 +13,21 @@ $generatedAt = Carbon::now();
 <head>
     <meta charset="UTF-8">
     <style>
+        @font-face {
+    font-family: 'Poppins-Regular';
+    src: url('{{ public_path("fonts/Poppins-Regular.ttf") }}') format('truetype');
+}
+ 
+@font-face {
+    font-family: 'Poppins-Medium';
+    src: url('{{ public_path("fonts/Poppins-Medium.ttf") }}') format('truetype');
+}
+ 
+@font-face {
+    font-family: 'Poppins-Bold';
+    src: url('{{ public_path("fonts/Poppins-Bold.ttf") }}') format('truetype');
+}
+ 
         * {
             margin: 0;
             padding: 0;
@@ -22,6 +37,7 @@ $generatedAt = Carbon::now();
         body {
             background-image:url('{{ public_path("assets/images/table-bg.png") }}');
             background-size: cover;
+            font-family: 'Poppins-Regular', sans-serif;
             padding: 20px;
         }
  
@@ -29,19 +45,19 @@ $generatedAt = Carbon::now();
             font-size: 40px;
             color: #353535;
             margin-bottom: 10px;
-            font-family: "Poppins"
+            font-family: 'Poppins-Medium', sans-serif;
         }
  
         .date-time span {
             display: inline-block;
             margin-right: 20px;
             font-size: 14px;
-            font-family: "Poppins"
         }
  
         .content-table thead th {
             background: #2C3E50;
             color: #fff;
+            font-family: 'Poppins-Medium', sans-serif;
             padding: 8px;
             text-align: left;
         }
@@ -49,7 +65,7 @@ $generatedAt = Carbon::now();
         .item-code {
             font-size: 8px;
             color: #404A4B;
-            font-family: "Poppins";
+            font-family: "Poppins-Regular";
             white-space: wrap;
             padding: 5px;
             white-space: normal;
@@ -81,6 +97,8 @@ $generatedAt = Carbon::now();
             border: 1px solid #ddd;
             vertical-align: middle;
             overflow: hidden;
+            font-family: 'Poppins-Regular', sans-serif;
+ 
         }
  
         .content-table tbody tr:nth-child(even) {
@@ -117,7 +135,7 @@ $generatedAt = Carbon::now();
             border-collapse: collapse;
             table-layout: fixed;
         }
- 
+ th{font-size: 12px;}
         .col-product {
             width: 30%;
         }
@@ -156,7 +174,6 @@ $generatedAt = Carbon::now();
             width: 100%;
             height: 100%;
         }
- 
         .price-cell br {
             display: none;
         }

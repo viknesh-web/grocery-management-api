@@ -62,7 +62,7 @@
     src: url('../../../fonts/Roboto-Medium.woff') format('woff');
     src: url('../../../fonts/Roboto-Medium.woff2') format('woff2');
 }
-
+ 
 .order-wrapper {width: 85%;margin: auto; border: 1px solid #ddd;padding: 20px;}
 #categoryFilter {padding: 8px 16px;border-radius: 6px;background: #3DA222;color: #fff; border: none;cursor: pointer;}
 .tables-wrapper {display: flex;gap: 20px;}
@@ -86,9 +86,14 @@ col.total { width: 80px; }
 .original-price {font-size: 12px;color: #999;display: inline-flex;align-items: center;gap: 4px;text-decoration-line: line-through;text-decoration-thickness: 1px;text-decoration-color: #999;line-height: 1.4;}
 .item-code{word-wrap: break-word;}
 .header{display: inline-block;}
+.gt-mobile {display: none;}
+ 
 @media (max-width: 1320px) {
-    .tables-wrapper {flex-direction: column;gap: 0;}    
+    .product-image img {width: 40%;height: 50px;-o-object-fit: cover;object-fit: cover;border: 1px solid #ddd;border-radius: 5px;}
+    .tables-wrapper {flex-direction: column;}
+    .table-box {width: 100% !important;}
     .table-box:last-child {display: none;}
+    .table-scroll {max-height: 72vh;}
     .order-wrapper {width: 95%;padding-top: 20px;}
     .order-wrapper > div:first-child {flex-direction: column;gap: 15px;text-align: center !important;}
     .header {margin-left: 0 !important;}
@@ -96,20 +101,23 @@ col.total { width: 80px; }
     #categoryFilter {margin-right: 0 !important;}
 }
 @media (max-width: 768px) {
-    .grand-total,.tables-wrapper{width:98% !important;}
-    .table-box {width: 97% !important;}
-    .order-wrapper {width: 100%;padding: 15px;}
+    .order-wrapper {width: 100%;padding:15px 0px;}
     table {font-size: 12px;}
     th, td {padding: 8px 4px;}
-    .product-image img {width: 60px;height: 50px;}
+    .product-image img {width: 50px;height: 40px;}
     .qty {width: 45px;}
+    .submit {margin: 15px auto;}
     col.name {width: 100px;}
     col.code {width: 70px;}
     col.price {width: 90px;}
-}
-@media (max-width: 1320px) {
-    .table-scroll {max-height: 72vh;}
+    .gt-desktop {display: none;}
+    .gt-mobile {display: table-cell;}
 }
 @media (max-width: 600px) {
+    td {font-size: 12px;}
     .table-scroll {max-height: 80vh;}
+}
+
+ .table-box.full-width {
+    width: 100% !important;
 }

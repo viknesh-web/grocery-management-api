@@ -134,18 +134,13 @@ class Product extends Model
      */
     public function getImageUrlAttribute(): ?string
     {
-        if (!$this->image) {
-            return null;
-        }
         $imagePath = ltrim($this->image, '/');
-        Log::debug(Storage::disk('media')->url($imagePath));
 
-        // Prefer `media` disk (custom storage). If file exists there, return its URL.
-        if (Storage::disk('media')->exists($imagePath)) {
+        if ($imagePath && Storage::disk('media')->exists($imagePath)) {
             return Storage::disk('media')->url($imagePath);
         }
 
-        return null;
+        return  asset('assets/images/no-image.png');
     }
 
     /**

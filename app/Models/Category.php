@@ -113,9 +113,14 @@ class Category extends Model
      */
     public function getImageUrlAttribute(): ?string
     {
-        if (!$this->image) return null;
-        // Image path already includes 'category/' prefix from ImageService
-        return Storage::disk('media')->url($this->image);
+        $imagePath = ltrim($this->image, '/');
+
+        if ($imagePath && Storage::disk('media')->exists($imagePath)) {
+            return Storage::disk('media')->url($imagePath);
+        }
+
+        return asset('assets/images/no-image.png');
+
     }
 
     /**

@@ -1,3 +1,6 @@
+<?php 
+    use Illuminate\Support\Facades\Storage;
+?>
 <!DOCTYPE html>
 <html>
 <head>
@@ -42,12 +45,19 @@
             </tr>
         </thead>
         <tbody>
-    
+           
             @php $grandTotal = 0; @endphp
+
             @foreach($products as $item)
-            <?php echo $item; ?>
             @php
-            $price = ($item->selling_price > 0 && $item->selling_price < $item->original_price)
+
+                $imagePath = null;
+
+                if (!empty($item->image_url)) {
+                    $relativePath = str_replace(url('/media').'/', '', $item->image_url);
+                    $imagePath = Storage::disk('media')->path($relativePath);
+                }
+                $price = ($item->selling_price > 0 && $item->selling_price < $item->original_price)
                 ? $item->selling_price
                 : $item->original_price;
                 $rowTotal = $price * $item->qty;
@@ -55,8 +65,13 @@
                 @endphp
                 <tr>
                     <td>{{ $loop->iteration }}</td>
-                    <td>{{ $item->image_url }}</td>
-                    <td><img src="{{ $item->image_url }}"></td>
+                    <td>{{ $item->name }}</td>
+                    <td>@if(file_exists($imagePath))
+                            <img src="{{ $imagePath }}" width="60">
+                        @else
+                            <span>No Image</span>
+                        @endif
+                    </td>
                     <td>{{ $item->item_code }}</td>
                     <td>
                         @if($item->selling_price > 0 && $item->selling_price < $item->original_price)
