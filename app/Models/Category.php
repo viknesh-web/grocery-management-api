@@ -113,14 +113,26 @@ class Category extends Model
      */
     public function getImageUrlAttribute(): ?string
     {
+        if (!$this->image) {
+            return asset('assets/images/no-image.png');
+        }
+
+        // Normalize path (remove leading slash)
         $imagePath = ltrim($this->image, '/');
 
-        if ($imagePath && Storage::disk('media')->exists($imagePath)) {
-            return Storage::disk('media')->url($imagePath);
+        // If path already contains "category/", use as-is
+        if (str_starts_with($imagePath, 'category/')) {
+            $storagePath = $imagePath;
+        } else {
+            $storagePath = 'category/' . $imagePath;
+        }
+
+
+        if (Storage::disk('media')->exists($storagePath)) {
+            return Storage::disk('media')->url($storagePath);
         }
 
         return asset('assets/images/no-image.png');
-
     }
 
     /**

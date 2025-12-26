@@ -86,6 +86,7 @@ col.total { width: 80px; }
 .original-price {font-size: 12px;color: #999;display: inline-flex;align-items: center;gap: 4px;text-decoration-line: line-through;text-decoration-thickness: 1px;text-decoration-color: #999;line-height: 1.4;}
 .item-code{word-wrap: break-word;}
 .header{display: inline-block;}
+.productTable input[type="number"] { padding: 6px;}
 @media (max-width: 1320px) {
     .tables-wrapper {flex-direction: column;gap: 0;}    
     .table-box:last-child {display: none;}
