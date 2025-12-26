@@ -195,19 +195,55 @@ class AddressService
             $mapped = collect($results)->map(function ($feature) {
                 $properties = $feature['properties'] ?? [];
 
+                // Extract address components
+                $houseNumber = $properties['housenumber'] ?? null;
+                $street = $properties['street'] ?? null;
+                $building = $properties['building'] ?? null;
+                $apartment = $properties['apartment'] ?? null;
+                
                 // Extract candidates for area: prefer more specific fields, fallback to city or formatted address
                 $areaCandidate = $properties['suburb'] ?? $properties['district'] ?? $properties['neighbourhood'] ?? $properties['quarter'] ?? $properties['city_district'] ?? null;
                 $city = $properties['city'] ?? null;
                 $emirate = $properties['state'] ?? null;
                 $fullAddress = $properties['formatted'] ?? null;
 
+                // Build area name
                 $areaName = $areaCandidate ?? $city ?? $fullAddress;
+                
+                // Build address line with street number, building, apartment, street
+                $addressLine = [];
+                if ($houseNumber) {
+                    $addressLine[] = $houseNumber;
+                }
+                if ($street) {
+                    $addressLine[] = $street;
+                }
+                if ($building) {
+                    $addressLine[] = $building;
+                }
+                if ($apartment) {
+                    $addressLine[] = 'Apt ' . $apartment;
+                }
+                
+                // Combine area with address details for better searchability and display
+                // This ensures street numbers are included in the area field which is searchable
+                $displayArea = $areaName;
+                if (!empty($addressLine)) {
+                    $addressLineStr = implode(' ', $addressLine);
+                    // Prepend address details to area for better searchability (e.g., "123 Main St, Dubai Marina")
+                    $displayArea = trim($addressLineStr . ', ' . $displayArea);
+                }
 
                 return [
-                    'area' => $areaName,
+                    'area' => $displayArea, // Includes street number for searchability
                     'city' => $city,
                     'emirate' => $emirate,
                     'full_address' => $fullAddress,
+                    'street' => $street,
+                    'house_number' => $houseNumber,
+                    'building' => $building,
+                    'apartment' => $apartment,
+                    'area_base' => $areaName, // Original area name without street details
                 ];
             })->filter(fn($item) => !empty($item['area']))->unique('area')->values()->toArray();
                 

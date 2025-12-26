@@ -43,9 +43,9 @@ class StoreCustomerRequest extends FormRequest
             // Remove spaces, dashes, and other formatting
             $whatsappNumber = preg_replace('/[\s\-\(\)]/', '', $whatsappNumber);
             
-            // Get validation country from config (default: IN)
-            $validationCountry = strtoupper(config('phone.validation_country', 'IN'));
-            $countryRules = config("phone.rules.{$validationCountry}", config('phone.rules.IN'));
+            // Get validation country from config (default: AE for UAE)
+            $validationCountry = strtoupper(config('phone.validation_country', 'AE'));
+            $countryRules = config("phone.rules.{$validationCountry}", config('phone.rules.AE'));
             $countryCode = $countryRules['country_code'];
             
             // Add + if not present
@@ -112,9 +112,9 @@ class StoreCustomerRequest extends FormRequest
      */
     public function rules(): array
     {
-        // Get validation country from config (default: IN)
-        $validationCountry = strtoupper(config('phone.validation_country', 'IN'));
-        $countryRules = config("phone.rules.{$validationCountry}", config('phone.rules.IN'));
+        // Get validation country from config (default: AE for UAE)
+        $validationCountry = strtoupper(config('phone.validation_country', 'AE'));
+        $countryRules = config("phone.rules.{$validationCountry}", config('phone.rules.AE'));
         
         $rules = [
             'name' => [
