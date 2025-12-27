@@ -78,6 +78,7 @@ class WhatsAppController extends Controller
     {
         // Handle JSON-encoded arrays from FormData
         $pdfType = $request->get('pdf_type', 'regular');
+        $pdfLayout = $request->get('pdf_layout', 'regular');
         
         $sendToAll = $request->boolean('send_to_all', false);
 
@@ -253,7 +254,8 @@ class WhatsAppController extends Controller
             $productIds,
             $templateId,
             $contentVariables,
-            $customPdfUrl
+            $customPdfUrl,
+            $pdfLayout
         );
 
         $successCount = collect($results)->where('success', true)->count();

@@ -30,7 +30,7 @@ class WhatsAppService
         $this->whatsappNumber = $whatsappNumber;
     }
 
-    public function sendPriceListToCustomers(?array $customerIds = null, ?string $customMessage = null, bool $includePdf = true, ?array $productIds = null, ?string $templateId = null, ?array $contentVariables = null, ?string $customPdfUrl = null): array
+    public function sendPriceListToCustomers(?array $customerIds = null, ?string $customMessage = null, bool $includePdf = true, ?array $productIds = null, ?string $templateId = null, ?array $contentVariables = null, ?string $customPdfUrl = null, string $pdfLayout = 'regular'): array
     {
         $results = [];
         $pdfUrl = null;
@@ -41,8 +41,8 @@ class WhatsAppService
                 // Use custom uploaded PDF
                 $pdfUrl = $customPdfUrl;
             } else {
-                // Generate PDF from products
-                $pdfPath = $this->pdfService->generatePriceList($productIds ?? []);
+                // Generate PDF from products and forward requested layout
+                $pdfPath = $this->pdfService->generatePriceList($productIds ?? [], $pdfLayout);
                 $pdfUrl = $this->pdfService->getPdfUrl($pdfPath);
             }
         }
