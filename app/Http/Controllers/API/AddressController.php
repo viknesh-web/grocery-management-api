@@ -1,8 +1,9 @@
 <?php
 
-namespace App\Http\Controllers\API\V1;
+namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
+use App\Models\Address;
 use App\Services\AddressService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,7 +20,7 @@ class AddressController extends Controller
     public function __construct(AddressService $addressService)
     {
         $this->addressService = $addressService;
-    }
+    }  
 
     /**
      * Search UAE areas using Nominatim API.

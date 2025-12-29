@@ -1,13 +1,13 @@
 <?php
 
-use App\Http\Controllers\API\V1\AddressController;
-use App\Http\Controllers\API\V1\AuthController;
-use App\Http\Controllers\API\V1\CategoryController;
-use App\Http\Controllers\API\V1\CustomerController;
-use App\Http\Controllers\API\V1\DashboardController;
-use App\Http\Controllers\API\V1\PriceUpdateController;
-use App\Http\Controllers\API\V1\ProductController;
-use App\Http\Controllers\API\V1\WhatsAppController;
+use App\Http\Controllers\API\AddressController;
+use App\Http\Controllers\API\AuthController;
+use App\Http\Controllers\API\CategoryController;
+use App\Http\Controllers\API\CustomerController;
+use App\Http\Controllers\API\DashboardController;
+use App\Http\Controllers\API\PriceUpdateController;
+use App\Http\Controllers\API\ProductController;
+use App\Http\Controllers\API\WhatsAppController;
 use Illuminate\Support\Facades\Route;
 
 
@@ -71,11 +71,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::delete('/', [CustomerController::class, 'destroy']);
             Route::post('/toggle-status', [CustomerController::class, 'toggleStatus']);
         });
-    });
-
-    if (config('features.address_field')) {
-        Route::apiResource('addresses', AddressController::class);
-    }
+    });  
 
     Route::get('/addresses/search-uae', [AddressController::class, 'searchUAE']);
 
