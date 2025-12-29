@@ -9,39 +9,6 @@ use Illuminate\Support\Facades\Storage;
 
 class PdfService
 {
-    // public function generatePriceList(array $productIds = []): string
-    // {
-    //     $query = Product::enabled()->with('category');
-
-    //     if (!empty($productIds)) {
-    //         $query->whereIn('id', $productIds);
-    //     }
-
-    //     $products = $query->orderBy('category_id')->orderBy('name')->get();
-
-    //     $groupedProducts = $products->groupBy('category.name');
-
-    //     $data = [
-    //         'groupedProducts' => $groupedProducts,
-    //         'date' => now()->format('d M Y'),
-    //         'time' => now()->format('h:i A'),
-    //     ];
-
-    //     $pdf = Pdf::loadView('pdfs.price-list', $data);
-    //     $pdf->setPaper('A4', 'portrait');
-
-    //     $filename = 'pdfs/price-list-' . date('Y-m-d-H-i-s') . '-' . uniqid() . '.pdf';
-    //     $path = storage_path('app/public/' . $filename);
-
-    //     $directory = dirname($path);
-    //     if (!is_dir($directory)) {
-    //         mkdir($directory, 0755, true);
-    //     }
-
-    //     $pdf->save($path);
-
-    //     return $filename;
-    // }
 
     public function generatePriceList(array $productIds = [], string $pdfLayout = 'regular'): string
     {
@@ -51,10 +18,7 @@ class PdfService
             $query->whereIn('id', $productIds);
         }
 
-        $products = $query
-            ->orderBy('category_id')
-            ->orderBy('name')
-            ->get();
+        $products = $query->orderBy('category_id')->orderBy('name')->get();
 
         // Determine which blade template to use based on layout
         $viewName = ($pdfLayout === 'catalog') ? 'pdfs.catalog-price-list' : 'pdfs.generate';
@@ -72,8 +36,7 @@ class PdfService
                 'time' => now()->format('h:i A'),
             ];
         }
-Log::debug($products);
-        Log::debug('Generating PDF price list', ['count' => $products->count(), 'layout' => $pdfLayout]);
+
         $pdf = Pdf::loadView($viewName, $data);
         $pdf->setPaper('A4', 'portrait');
 

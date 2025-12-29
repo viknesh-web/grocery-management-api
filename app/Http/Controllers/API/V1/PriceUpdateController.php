@@ -69,7 +69,7 @@ class PriceUpdateController extends Controller
             }
         }
 
-        $products = $query->orderBy('name')->with(['category:id,name,slug'])->get();
+        $products = $query->with(['category:id,name,slug'])->orderBy('name')->get();
         $data = $products->map(function ($product) {
                 $discountActive = $product->isDiscountActive();
                 return [
@@ -174,10 +174,7 @@ class PriceUpdateController extends Controller
     public function recent(Request $request): JsonResponse
     {
         $limit = $request->get('limit', 20);
-        $updates = PriceUpdate::with(['product:id,name,item_code', 'updater:id,name,email'])
-            ->orderBy('created_at', 'desc')
-            ->limit($limit)
-            ->get();
+        $updates = PriceUpdate::with(['product:id,name,item_code', 'updater:id,name,email'])->orderBy('created_at', 'desc')->limit($limit)->get();
 
         return response()->json([
             'data' => PriceUpdateResource::collection($updates),

@@ -2,31 +2,23 @@
 
 namespace App\Http\Controllers\API\V1;
 
+use App\Helper\DataNormalizer;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Customer\StoreCustomerRequest;
-use App\Http\Requests\Customer\UpdateCustomerRequest;
 use App\Http\Resources\Customer\CustomerCollection;
 use App\Http\Resources\Customer\CustomerResource;
 use App\Models\Customer;
 use App\Services\CustomerService;
+use App\Validator\CustomerValidator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 
-/**
- * Customer Controller
- * 
- * Handles HTTP requests for customer management operations.
- * Business logic is delegated to CustomerService.
- */
 class CustomerController extends Controller
 {
     public function __construct(
         private CustomerService $customerService
     ) {}
 
-    /**
-     * Display a listing of customers.
-     */
     public function index(Request $request): CustomerCollection
     {
         $filters = [
@@ -42,14 +34,14 @@ class CustomerController extends Controller
         return new CustomerCollection($customers);
     }
 
-    /**
-     * Store a newly created customer.
-     */
-    public function store(StoreCustomerRequest $request): JsonResponse
+    public function store(Request $request): JsonResponse
     {
+        $validator = Validator::make($request->all(), CustomerValidator::onCreate(), CustomerValidator::messages());
+        $data = $validator->validate();
+        $data = DataNormalizer::normalizeCustomer($data);
+
         try {
-            $customer = $this->customerService->create(
-                $request->validated(),
+            $customer = $this->customerService->create($data,
                 $request->user()->id
             );
 
@@ -65,9 +57,6 @@ class CustomerController extends Controller
         }
     }
 
-    /**
-     * Display the specified customer.
-     */
     public function show(Customer $customer): JsonResponse
     {
         $customer = $this->customerService->find($customer->id);
@@ -83,15 +72,16 @@ class CustomerController extends Controller
         ], 200);
     }
 
-    /**
-     * Update the specified customer.
-     */
-    public function update(UpdateCustomerRequest $request, Customer $customer): JsonResponse
+    public function update(Request $request, Customer $customer): JsonResponse
     {
+        $validator = Validator::make($request->all(), CustomerValidator::onUpdate($customer->id), CustomerValidator::messages());
+        $data = $validator->validate();
+        $data = DataNormalizer::normalizeCustomer($data, $customer->id);
+
         try {
             $customer = $this->customerService->update(
                 $customer,
-                $request->validated(),
+                $data,
                 $request->user()->id
             );
 
@@ -107,17 +97,12 @@ class CustomerController extends Controller
         }
     }
 
-    /**
-     * Remove the specified customer.
-     */
     public function destroy(Customer $customer): JsonResponse
     {
         try {
             $this->customerService->delete($customer);
 
-            return response()->json([
-                'message' => 'Customer deleted successfully',
-            ], 200);
+            return response()->json(['message' => 'Customer deleted successfully'], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Failed to delete customer',
@@ -126,9 +111,6 @@ class CustomerController extends Controller
         }
     }
 
-    /**
-     * Toggle customer active status.
-     */
     public function toggleStatus(Request $request, Customer $customer): JsonResponse
     {
         $customer = $this->customerService->toggleStatus($customer, $request->user()->id);
@@ -138,4 +120,5 @@ class CustomerController extends Controller
             'data' => new CustomerResource($customer),
         ], 200);
     }
+
 }

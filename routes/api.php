@@ -5,7 +5,6 @@ use App\Http\Controllers\API\V1\AuthController;
 use App\Http\Controllers\API\V1\CategoryController;
 use App\Http\Controllers\API\V1\CustomerController;
 use App\Http\Controllers\API\V1\DashboardController;
-use App\Http\Controllers\API\V1\OrderFormController;
 use App\Http\Controllers\API\V1\PriceUpdateController;
 use App\Http\Controllers\API\V1\ProductController;
 use App\Http\Controllers\API\V1\WhatsAppController;

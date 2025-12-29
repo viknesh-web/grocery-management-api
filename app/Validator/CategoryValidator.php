@@ -2,20 +2,11 @@
 
 namespace App\Validator;
 
+use App\Models\Category;
 use Illuminate\Validation\Rule;
 
-/**
- * Category Validator
- * 
- * Provides validation rules for category operations.
- */
 class CategoryValidator
 {
-    /**
-     * Get validation rules for creating a category.
-     *
-     * @return array<string, array>
-     */
     public static function onCreate(): array
     {
         return [
@@ -25,21 +16,11 @@ class CategoryValidator
             'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048'],
             'is_active' => ['sometimes', 'boolean'],
             'display_order' => ['nullable', 'integer', 'min:0', 'max:9999'],
-            'parent_id' => [
-                'nullable',
-                'integer',
-                'exists:categories,id'
-            ],
+            'parent_id' => ['nullable', 'integer', 'exists:categories,id'],
         ];
     }
 
-    /**
-     * Get validation rules for editing a category.
-     *
-     * @param int|null $id The category ID to exclude from unique checks
-     * @return array<string, array>
-     */
-    public static function onEdit(?int $id = null): array
+    public static function onUpdate(?int $id = null): array
     {
         return [
             'name' => ['sometimes', 'required', 'string', 'max:255', 'min:2', Rule::unique('categories', 'name')->ignore($id)],
@@ -49,11 +30,7 @@ class CategoryValidator
             'image_removed' => ['sometimes', 'boolean'],
             'is_active' => ['sometimes', 'boolean'],
             'display_order' => ['nullable', 'integer', 'min:0', 'max:9999'],
-            'parent_id' => [
-                'nullable',
-                'integer',
-                'exists:categories,id',
-            ],
+            'parent_id' => ['nullable', 'integer', 'exists:categories,id'],
         ];
     }
 
@@ -66,7 +43,7 @@ class CategoryValidator
      */
     protected static function wouldCreateCircularReference($category, int $newParentId): bool
     {
-        $parent = \App\Models\Category::find($newParentId);
+        $parent = Category::find($newParentId);
         if (!$parent) {
             return false;
         }
@@ -77,7 +54,7 @@ class CategoryValidator
             if ($currentParent->parent_id == $category->id) {
                 return true;
             }
-            $currentParent = \App\Models\Category::find($currentParent->parent_id);
+            $currentParent = Category::find($currentParent->parent_id);
         }
 
         return false;

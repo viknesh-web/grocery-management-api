@@ -30,13 +30,10 @@ class DashboardController extends Controller
         $activeCustomers = Customer::active()->count();
 
         // Recent price updates (last 7 days)
-        $recentPriceUpdates = PriceUpdate::where('created_at', '>=', now()->subDays(7))
-            ->count();
+        $recentPriceUpdates = PriceUpdate::where('created_at', '>=', now()->subDays(7))->count();
 
         // Low stock products (less than 10)
-        $lowStockProducts = Product::where('stock_quantity', '<', 10)
-            ->enabled()
-            ->count();
+        $lowStockProducts = Product::where('stock_quantity', '<', 10)->enabled()->count();
 
         // Product type statistics
         $dailyProducts = Product::where('product_type', 'daily')->count();

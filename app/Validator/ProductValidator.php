@@ -7,9 +7,6 @@ use Illuminate\Validation\Rule;
 
 class ProductValidator
 {
-    /**
-     * Common rules shared between create & edit
-     */
     private static function baseRules(): array
     {
         return [
@@ -28,9 +25,6 @@ class ProductValidator
         ];
     }
 
-    /**
-     * Create rules
-     */
     public static function onCreate(): array
     {
         return array_merge(self::baseRules(), [
@@ -45,10 +39,24 @@ class ProductValidator
         ]);
     }
 
-    /**
-     * Edit rules
-     */
-    public static function onEdit(int $id): array
+    public static function onIndex(): array
+    {
+        return [
+            'search' => ['sometimes', 'string', 'max:255'],
+            'category_id' => ['sometimes', 'integer', 'exists:categories,id'],
+            'product_type' => ['sometimes', 'string', 'in:daily,standard'],
+            'status' => ['sometimes', 'string', 'in:enabled,disabled'],
+            'enabled' => ['sometimes', 'boolean'],
+            'has_discount' => ['sometimes', 'boolean'],
+            'stock_status' => ['sometimes', 'string', 'in:in_stock,low_stock,out_of_stock'],
+            'sort_by' => ['sometimes', 'string', 'in:name,original_price,selling_price,stock_quantity,created_at,product_type'],
+            'sort_order' => ['sometimes', 'string', 'in:asc,desc'],
+            'page' => ['sometimes', 'integer', 'min:1'],
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
+        ];
+    }
+
+    public static function onUpdate(int $id): array
     {
         return array_merge(self::baseRules(), [
             'name' => ['sometimes', 'required'],
@@ -63,9 +71,6 @@ class ProductValidator
         ]);
     }
 
-    /**
-     * Discount validation logic (shared)
-     */
     private static function discountRule(?int $id = null): array
     {
         return [

@@ -33,10 +33,7 @@ class PriceUpdateRepository implements PriceUpdateRepositoryInterface
      */
     public function getProductHistory(int $productId, int $limit = 50): Collection
     {
-        return PriceUpdate::where('product_id', $productId)
-            ->orderBy('created_at', 'desc')
-            ->limit($limit)
-            ->get();
+        return PriceUpdate::where('product_id', $productId)->orderBy('created_at', 'desc')->limit($limit)->get();
     }
 
     /**
@@ -48,9 +45,7 @@ class PriceUpdateRepository implements PriceUpdateRepositoryInterface
      */
     public function getByDateRange(string $startDate, string $endDate): Collection
     {
-        return PriceUpdate::whereBetween('created_at', [$startDate, $endDate])
-            ->orderBy('created_at', 'desc')
-            ->get();
+        return PriceUpdate::whereBetween('created_at', [$startDate, $endDate])->orderBy('created_at', 'desc')->get();
     }
 
     /**
@@ -68,9 +63,7 @@ class PriceUpdateRepository implements PriceUpdateRepositoryInterface
             $query->with($relations);
         }
 
-        return $query->orderBy('created_at', 'desc')
-            ->limit($limit)
-            ->get();
+        return $query->orderBy('created_at', 'desc')->limit($limit)->get();
     }
 
     /**

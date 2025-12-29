@@ -4,71 +4,57 @@ namespace App\Validator;
 
 use Illuminate\Validation\Rule;
 
-/**
- * Customer Validator
- * 
- * Provides validation rules for customer operations.
- */
 class CustomerValidator
 {
-    /**
-     * Get validation rules for creating a customer.
-     *
-     * @return array<string, array>
-     */
     public static function onCreate(): array
     {
+        // Get validation country from config (default: AE for UAE)
+        $validationCountry = strtoupper(config('phone.validation_country', 'AE'));
+        $countryRules = config("phone.rules.{$validationCountry}", config('phone.rules.AE'));
+
         $rules = [
-            'name' => ['required', 'string', 'max:255', 'min:2'],
-            'whatsapp_number' => [
-                'required',
-                'string',
-                'regex:/^\+91[6-9]\d{9}$/',
-                'unique:customers,whatsapp_number',
-            ],
+            'name' => ['required', 'string', 'min:2', 'max:100', 'regex:/^[a-zA-Z\s\-\']+$/'],
+            'whatsapp_number' => ['required', 'string', 'regex:' . $countryRules['regex'], 'unique:customers,whatsapp_number'],
+            'landmark' => ['nullable', 'string', 'max:255'],
             'remarks' => ['nullable', 'string', 'max:1000'],
             'active' => ['sometimes', 'boolean'],
+            // Always accept both address and area fields
+            'address' => ['nullable', 'string', 'max:1000'],
+            'area' => ['nullable', 'string', 'max:255'],
         ];
-
-        // Conditionally add address or area field based on feature flag
-        if (config('features.address_field')) {
-            $rules['area'] = ['nullable', 'string', 'max:255'];
-        } else {
-            $rules['address'] = ['nullable', 'string', 'max:1000'];
-        }
 
         return $rules;
     }
 
-    /**
-     * Get validation rules for editing a customer.
-     *
-     * @param int|null $id The customer ID to exclude from unique checks
-     * @return array<string, array>
-     */
-    public static function onEdit(?int $id = null): array
+    public static function onUpdate(?int $id = null): array
     {
+        // Get validation country from config (default: AE for UAE)
+        $validationCountry = strtoupper(config('phone.validation_country', 'AE'));
+        $countryRules = config("phone.rules.{$validationCountry}", config('phone.rules.AE'));
+
         $rules = [
-            'name' => ['sometimes', 'required', 'string', 'max:255', 'min:2'],
-            'whatsapp_number' => [
-                'sometimes',
-                'required',
-                'string',
-                'regex:/^\+91[6-9]\d{9}$/',
-                Rule::unique('customers', 'whatsapp_number')->ignore($id),
-            ],
+            'name' => ['sometimes', 'required', 'string', 'min:2', 'max:100', 'regex:/^[a-zA-Z\s\-\']+$/'],
+            'whatsapp_number' => ['sometimes', 'required', 'string', 'regex:' . $countryRules['regex'], Rule::unique('customers', 'whatsapp_number')->ignore($id)],
+            'landmark' => ['nullable', 'string', 'max:255'],
             'remarks' => ['nullable', 'string', 'max:1000'],
             'active' => ['sometimes', 'boolean'],
+            // Always accept both address and area fields
+            'address' => ['sometimes', 'nullable', 'string', 'max:1000'],
+            'area' => ['sometimes', 'nullable', 'string', 'max:255'],
         ];
 
-        // Conditionally add address or area field based on feature flag
-        if (config('features.address_field')) {
-            $rules['area'] = ['nullable', 'string', 'max:255'];
-        } else {
-            $rules['address'] = ['nullable', 'string', 'max:1000'];
-        }
-
         return $rules;
+    }
+
+    public static function messages(): array
+    {
+        $validationCountry = strtoupper(config('phone.validation_country', 'AE'));
+        $countryRules = config("phone.rules.{$validationCountry}", config('phone.rules.AE'));
+
+        return [
+            'whatsapp_number.regex' => $countryRules['error_message'],
+            'name.regex' => 'Please enter a valid name (2-100 characters, letters only)',
+        ];
     }
 }
 

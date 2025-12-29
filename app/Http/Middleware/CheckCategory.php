@@ -5,30 +5,22 @@ namespace App\Http\Middleware;
 use App\Models\Category;
 use Closure;
 use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\Response;
 
 class CheckCategory
 {
-    /**
-     * Handle an incoming request.
-     *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
-     */
-    public function handle(Request $request, Closure $next): Response
+    public function handle($request, Closure $next)
     {
-        // Get ID from route parameter or request payload
         $categoryId = $request->route('category') ?? $request->input('id');
         
-        if ($categoryId) {
-            $category = Category::find($categoryId);
+        if ($categoryId && intval($categoryId)) {
+            $id = intval($categoryId);
+            $item = Category::find($id);
             
-            if (!$category) {
-                return response()->json([
-                    'message' => 'Category not found',
-                ], 404);
+            if (!$item) {
+                return response()->json(['message' => 'Category not found'], 404);
             }
             
-            $request->category = $category;
+            $request->attributes->set('category', $item);
         }
         
         return $next($request);

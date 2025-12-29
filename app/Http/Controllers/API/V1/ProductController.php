@@ -2,48 +2,26 @@
 
 namespace App\Http\Controllers\API\V1;
 
+use App\Helper\DataNormalizer;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Product\StoreProductRequest;
-use App\Http\Requests\Product\UpdateProductRequest;
 use App\Http\Resources\Product\ProductCollection;
 use App\Http\Resources\Product\ProductResource;
-use App\Models\Product;
 use App\Services\ProductService;
+use App\Validator\ProductValidator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Validator;
 
-/**
- * Product Controller
- * 
- * Handles HTTP requests for product management operations.
- * Business logic is delegated to ProductService.
- */
 class ProductController extends Controller
 {
     public function __construct(
         private ProductService $productService
     ) {}
 
-    /**
-     * Display a listing of products with advanced filtering.
-     */
     public function index(Request $request): JsonResponse
     {
-        // Validate query parameters
-        $request->validate([
-            'search' => ['sometimes', 'string', 'max:255'],
-            'category_id' => ['sometimes', 'integer', 'exists:categories,id'],
-            'product_type' => ['sometimes', 'string', 'in:daily,standard'],
-            'status' => ['sometimes', 'string', 'in:enabled,disabled'],
-            'enabled' => ['sometimes', 'boolean'],
-            'has_discount' => ['sometimes', 'boolean'],
-            'stock_status' => ['sometimes', 'string', 'in:in_stock,low_stock,out_of_stock'],
-            'sort_by' => ['sometimes', 'string', 'in:name,original_price,selling_price,stock_quantity,created_at,product_type'],
-            'sort_order' => ['sometimes', 'string', 'in:asc,desc'],
-            'page' => ['sometimes', 'integer', 'min:1'],
-            'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
-        ]);
+        $validator = Validator::make($request->all(), ProductValidator::onIndex());
+        $validator->validate();
 
         $filters = [
             'search' => $request->get('search'),
@@ -61,14 +39,13 @@ class ProductController extends Controller
         $products = $this->productService->getPaginated($filters, $perPage);
 
         $collection = new ProductCollection($products);
-        $response = $collection->response()->getData(true);
+        $responseData = $collection->response()->getData(true);
         
-        // Get metadata from service
         $filtersApplied = property_exists($products, 'filters_applied') ? $products->filters_applied : [];
         $totalFiltered = property_exists($products, 'total_filtered') ? $products->total_filtered : $products->total();
         
-        return response()->json([
-            'data' => $response['data'],
+        $response = [
+            'data' => $responseData['data'],
             'meta' => [
                 'current_page' => $products->currentPage(),
                 'from' => $products->firstItem(),
@@ -85,127 +62,102 @@ class ProductController extends Controller
                 'prev' => $products->previousPageUrl(),
                 'next' => $products->nextPageUrl(),
             ],
-        ], 200);
+        ];
+
+        return response()->json($response, 200);
     }
 
-    /**
-     * Store a newly created product.
-     */
-    public function store(StoreProductRequest $request): JsonResponse
+    public function store(Request $request): JsonResponse
     {
-        try {
-            $product = $this->productService->create(
-                $request->validated(),
-                $request->file('image'),
-                $request->user()->id
-            );
+        $validator = Validator::make($request->all(), ProductValidator::onCreate());
+        $data = $validator->validate();
+        $data = DataNormalizer::normalizeProduct($data);
 
-            return response()->json([
+        try {
+            $product = $this->productService->create($data, $request->file('image'), $request->user()->id);
+            
+            $response = [
                 'message' => 'Product created successfully',
                 'data' => new ProductResource($product),
-            ], 201);
-        } catch (ValidationException $e) {
-            return response()->json([
-                'message' => 'Validation failed',
-                'errors' => $e->errors(),
-            ], 422);
+            ];
+
+            return response()->json($response, 201);
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to create product',
-                'error' => $e->getMessage(),
-            ], 500);
+            report($e);
+            throw new \Exception("Unable to create product");
         }
     }
 
-    /**
-     * Display the specified product.
-     */
-    public function show(Product $product): JsonResponse
+    public function show(Request $request): JsonResponse
     {
-        $product = $this->productService->find($product->id);
-
-        if (!$product) {
-            return response()->json([
-                'message' => 'Product not found',
-            ], 404);
-        }
-
-        return response()->json([
+        $product = $request->get('product');
+        
+        $response = [
             'data' => new ProductResource($product),
-        ], 200);
+        ];
+
+        return response()->json($response);
     }
 
-    /**
-     * Update the specified product.
-     */
-    public function update(UpdateProductRequest $request, Product $product): JsonResponse
+    public function update(Request $request): JsonResponse
     {
-        try {
-            $product = $this->productService->update(
-                $product,
-                $request->validated(),
-                $request->file('image'),
-                $request->boolean('image_removed', false),
-                $request->user()->id
-            );
+        $product = $request->get('product');
+        $validator = Validator::make($request->all(), ProductValidator::onUpdate($product->id));
+        $data = $validator->validate();
+        $data = DataNormalizer::normalizeProduct($data, $product->id);
 
-            return response()->json([
+        try {
+            $product = $this->productService->update($product, $data, $request->file('image'), $request->boolean('image_removed', false), $request->user()->id);
+            
+            $response = [
                 'message' => 'Product updated successfully',
                 'data' => new ProductResource($product),
-            ], 200);
-        } catch (ValidationException $e) {
-            return response()->json([
-                'message' => 'Validation failed',
-                'errors' => $e->errors(),
-            ], 422);
+            ];
+
+            return response()->json($response);
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to update product',
-                'error' => $e->getMessage(),
-            ], 500);
+            report($e);
+            throw new \Exception("Unable to update product");
         }
     }
 
-    /**
-     * Remove the specified product.
-     */
-    public function destroy(Product $product): JsonResponse
+    public function destroy(Request $request): JsonResponse
     {
+        $product = $request->get('product');
+
         try {
             $this->productService->delete($product);
-
-            return response()->json([
+            
+            $response = [
                 'message' => 'Product deleted successfully',
-            ], 200);
+            ];
+
+            return response()->json($response);
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to delete product',
-                'error' => $e->getMessage(),
-            ], 500);
+            report($e);
+            throw new \Exception("Unable to delete product");
         }
     }
 
-    /**
-     * Toggle product enabled status.
-     */
-    public function toggleStatus(Request $request, Product $product): JsonResponse
+    public function toggleStatus(Request $request): JsonResponse
     {
+        $product = $request->get('product');
         $product = $this->productService->toggleStatus($product, $request->user()->id);
-
-        return response()->json([
+        
+        $response = [
             'message' => 'Product status updated successfully',
             'data' => new ProductResource($product),
-        ], 200);
+        ];
+
+        return response()->json($response);
     }
 
-    /**
-     * Get variations for a product.
-     */
-    public function getVariations(Product $product): JsonResponse
+    public function getVariations(Request $request): JsonResponse
     {
+        $product = $request->get('product');
         $variations = $product->activeVariations()->get();
-
-        return response()->json([
+        
+        $response = [
             'data' => $variations->map(function ($variation) {
                 return [
                     'id' => $variation->id,
@@ -219,6 +171,8 @@ class ProductController extends Controller
                     'is_in_stock' => $variation->isInStock(),
                 ];
             }),
-        ], 200);
+        ];
+
+        return response()->json($response);
     }
 }

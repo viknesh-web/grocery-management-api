@@ -2,32 +2,23 @@
 
 namespace App\Http\Controllers\API\V1;
 
+use App\Helper\DataNormalizer;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Category\StoreCategoryRequest;
-use App\Http\Requests\Category\UpdateCategoryRequest;
 use App\Http\Resources\Category\CategoryCollection;
 use App\Http\Resources\Category\CategoryResource;
 use App\Http\Resources\Product\ProductCollection;
-use App\Models\Category;
 use App\Services\CategoryService;
+use App\Validator\CategoryValidator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 
-/**
- * Category Controller
- * 
- * Handles HTTP requests for category management operations.
- * Business logic is delegated to CategoryService.
- */
 class CategoryController extends Controller
 {
     public function __construct(
         private CategoryService $categoryService
     ) {}
 
-    /**
-     * Display a listing of categories.
-     */
     public function index(Request $request): CategoryCollection
     {
         $filters = [
@@ -45,102 +36,91 @@ class CategoryController extends Controller
         return new CategoryCollection($categories);
     }
 
-    /**
-     * Store a newly created category.
-     * Note: Route uses 'create' but method is 'store' for Laravel convention.
-     */
-    public function store(StoreCategoryRequest $request): JsonResponse
+    public function store(Request $request): JsonResponse
     {
-        $category = $this->categoryService->create(
-            $request->validated(),
-            $request->file('image'),
-            $request->user()->id
-        );
+        $validator = Validator::make($request->all(), CategoryValidator::onCreate());
+        $data = $validator->validate();
+        $data = DataNormalizer::normalizeCategory($data);
 
-        return response()->json([
-            'message' => 'Category created successfully',
-            'data' => new CategoryResource($category),
-        ], 201);
-    }
-
-    /**
-     * Display the specified category.
-     */
-    public function show(Category $category): JsonResponse
-    {
-        $category = $this->categoryService->find($category->id);
-
-        if (!$category) {
-            return response()->json([
-                'message' => 'Category not found',
-            ], 404);
-        }
-
-        return response()->json([
-            'data' => new CategoryResource($category),
-        ], 200);
-    }
-
-    /**
-     * Update the specified category.
-     */
-    public function update(UpdateCategoryRequest $request, Category $category): JsonResponse
-    {
         try {
-            $category = $this->categoryService->update(
-                $category,
-                $request->validated(),
-                $request->file('image'),
-                $request->boolean('image_removed', false),
-                $request->user()->id
-            );
+            $category = $this->categoryService->create($data, $request->file('image'), $request->user()->id);
+            
+            $response = [
+                'message' => 'Category created successfully',
+                'data' => new CategoryResource($category),
+            ];
 
-            return response()->json([
+            return response()->json($response, 201);
+        } catch (\Exception $e) {
+            report($e);
+            throw new \Exception("Unable to create category");
+        }
+    }
+
+    public function show(Request $request): JsonResponse
+    {
+        $category = $request->get('category');
+        
+        $response = [
+            'data' => new CategoryResource($category),
+        ];
+
+        return response()->json($response);
+    }
+
+    public function update(Request $request): JsonResponse
+    {
+        $category = $request->get('category');
+        $validator = Validator::make($request->all(), CategoryValidator::onUpdate($category->id));
+        $data = $validator->validate();
+        $data = DataNormalizer::normalizeCategory($data, $category->id);
+
+        try {
+            $category = $this->categoryService->update($category, $data, $request->file('image'), $request->boolean('image_removed', false), $request->user()->id);
+            
+            $response = [
                 'message' => 'Category updated successfully',
                 'data' => new CategoryResource($category),
-            ], 200);
+            ];
+
+            return response()->json($response);
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to update category',
-                'error' => $e->getMessage(),
-            ], 500);
+            report($e);
+            throw new \Exception("Unable to update category");
         }
     }
 
-    /**
-     * Remove the specified category.
-     */
-    public function destroy(Category $category): JsonResponse
+    public function destroy(Request $request): JsonResponse
     {
+        $category = $request->get('category');
+
         try {
             $this->categoryService->delete($category);
-
-            return response()->json([
+            
+            $response = [
                 'message' => 'Category deleted successfully',
-            ], 200);
+            ];
+
+            return response()->json($response);
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => $e->getMessage(),
-            ], 422);
+            report($e);
+            throw new \Exception("Unable to delete category");
         }
     }
 
-    /**
-     * Toggle category active status.
-     */
-    public function toggleStatus(Request $request, Category $category): JsonResponse
+    public function toggleStatus(Request $request): JsonResponse
     {
+        $category = $request->get('category');
         $category = $this->categoryService->toggleStatus($category, $request->user()->id);
-
-        return response()->json([
+        
+        $response = [
             'message' => 'Category status updated successfully',
             'data' => new CategoryResource($category),
-        ], 200);
+        ];
+
+        return response()->json($response);
     }
 
-    /**
-     * Reorder categories.
-     */
     public function reorder(Request $request): JsonResponse
     {
         $request->validate([
@@ -150,15 +130,14 @@ class CategoryController extends Controller
         ]);
 
         $this->categoryService->reorder($request->categories);
-
-        return response()->json([
+        
+        $response = [
             'message' => 'Categories reordered successfully',
-        ], 200);
+        ];
+
+        return response()->json($response);
     }
 
-    /**
-     * Search categories.
-     */
     public function search(Request $request, string $query): CategoryCollection
     {
         $categories = $this->categoryService->search($query);
@@ -166,23 +145,20 @@ class CategoryController extends Controller
         return new CategoryCollection($categories);
     }
 
-    /**
-     * Get category tree (hierarchical structure).
-     */
     public function tree(Request $request): JsonResponse
     {
         $categories = $this->categoryService->getTree();
-
-        return response()->json([
+        
+        $response = [
             'data' => CategoryResource::collection($categories),
-        ], 200);
+        ];
+
+        return response()->json($response);
     }
 
-    /**
-     * Get products in a category.
-     */
-    public function products(Request $request, Category $category): ProductCollection
+    public function products(Request $request): ProductCollection
     {
+        $category = $request->get('category');
         $filters = [
             'search' => $request->get('search'),
             'enabled' => $request->get('enabled'),
