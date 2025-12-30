@@ -43,8 +43,8 @@ class StoreProductRequest extends FormRequest
         }
 
         // Normalize prices
-        if ($this->has('original_price') && $this->original_price !== null && $this->original_price !== '') {
-            $dataToMerge['original_price'] = (float) $this->original_price;
+        if ($this->has('regular_price') && $this->regular_price !== null && $this->regular_price !== '') {
+            $dataToMerge['regular_price'] = (float) $this->regular_price;
         }
 
         if ($this->has('discount_value') && $this->discount_value !== null && $this->discount_value !== '') {
@@ -79,10 +79,11 @@ class StoreProductRequest extends FormRequest
             $dataToMerge['product_type'] = 'daily';
         }
 
-        if ($this->has('enabled')) {
-            $dataToMerge['enabled'] = $this->boolean('enabled');
+        // Normalize status with default
+        if ($this->has('status') && in_array($this->status, ['active', 'inactive'])) {
+            $dataToMerge['status'] = $this->status;
         } else {
-            $dataToMerge['enabled'] = true;
+            $dataToMerge['status'] = 'active';
         }
 
         // Clear discount_value if discount_type is 'none'
@@ -90,15 +91,6 @@ class StoreProductRequest extends FormRequest
             $dataToMerge['discount_value'] = null;
         }
 
-        if ($this->has('variations') && is_array($this->variations)) {
-            foreach ($this->variations as $index => $variation) {
-                if (isset($variation['enabled'])) {
-                    $this->merge([
-                        "variations.{$index}.enabled" => (bool) $variation['enabled']
-                    ]);
-                }
-            }
-        }
 
         if (!empty($dataToMerge)) {
             $this->merge($dataToMerge);
@@ -117,7 +109,7 @@ class StoreProductRequest extends FormRequest
             'item_code' => ['required', 'string', 'max:100', Rule::unique('products', 'item_code')],
             'category_id' => ['required', 'integer', 'exists:categories,id'],
             'image' => ['required', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048'],
-            'original_price' => ['required', 'numeric', 'min:0', 'max:999999.99'],
+            'regular_price' => ['required', 'numeric', 'min:0', 'max:999999.99'],
             'discount_type' => ['sometimes', Rule::in(['percentage', 'fixed', 'none'])],
             'discount_value' => [
                 'nullable',
@@ -140,7 +132,7 @@ class StoreProductRequest extends FormRequest
                     }
 
                     if ($type === 'fixed') {
-                        $price = $this->input('original_price');
+                        $price = $this->input('regular_price');
                         if ($price && $value >= $price) {
                             $fail('The fixed discount must be less than the regular price.');
                         }
@@ -151,15 +143,8 @@ class StoreProductRequest extends FormRequest
             'discount_end_date' => ['nullable', 'date', 'after_or_equal:discount_start_date'],
             'stock_quantity' => ['required', 'numeric', 'min:0', 'max:999999.99'],
             'stock_unit' => ['required', Rule::in(['Kg', 'Pieces', 'Units', 'L'])],
-            'enabled' => ['sometimes', 'boolean'],
+            'status' => ['sometimes', 'string', Rule::in(['active', 'inactive'])],
             'product_type' => ['sometimes', Rule::in(['daily', 'standard'])],
-            'variations' => ['required', 'array', 'min:1'],
-            'variations.*.quantity' => ['required', 'numeric', 'min:0.01'],
-            'variations.*.unit' => ['required', Rule::in(['gm', 'kg', 'ml', 'liter', 'piece', 'packet', 'dozen'])],
-            'variations.*.price' => ['required', 'numeric', 'min:0'],
-            'variations.*.stock_quantity' => ['required', 'integer', 'min:0'],
-            'variations.*.sku' => ['nullable', 'string', 'max:100'],
-            'variations.*.enabled' => ['sometimes', 'boolean'],
         ];
     }
 }

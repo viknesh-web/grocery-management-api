@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\API\V1;
+namespace App\Http\Controllers\API;
 
 use App\Helper\DataNormalizer;
 use App\Http\Controllers\Controller;
@@ -22,7 +22,7 @@ class CustomerController extends Controller
     {
         $filters = [
             'search' => $request->get('search'),
-            'active' => $request->get('active'),
+            'status' => $request->get('status'),
             'sort_by' => $request->get('sort_by', 'created_at'),
             'sort_order' => $request->get('sort_order', 'desc'),
         ];

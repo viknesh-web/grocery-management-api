@@ -20,26 +20,18 @@ class Product extends Model
         'item_code',
         'category_id',
         'image',
-        'original_price',
-        'discount_type',
-        'discount_value',
-        'discount_start_date',
-        'discount_end_date',
+        'regular_price',
         'stock_quantity',
         'stock_unit',
-        'enabled',
+        'status',
         'product_type',
         'created_by',
         'updated_by',
     ];
 
     protected $casts = [
-        'original_price' => 'decimal:2',
-        'discount_value' => 'decimal:2',
+        'regular_price' => 'decimal:2',
         'stock_quantity' => 'decimal:2',
-        'enabled' => 'boolean',
-        'discount_start_date' => 'date',
-        'discount_end_date' => 'date',
     ];
 
     protected $appends = [
@@ -55,30 +47,20 @@ class Product extends Model
      */
     public function isDiscountActive(?Carbon $now = null): bool
     {
-        // No discount configured
-        if ($this->discount_type === 'none' || !$this->discount_value) {
-            return false;
-        }
+        $activeDiscount = $this->discounts()
+            ->where('status', 'active')
+            ->where(function ($query) use ($now) {
+                $now = $now ?: Carbon::now();
+                $query->whereNull('start_date')
+                    ->orWhere('start_date', '<=', $now)
+                    ->where(function ($q) use ($now) {
+                        $q->whereNull('end_date')
+                            ->orWhere('end_date', '>=', $now);
+                    });
+            })
+            ->first();
 
-        $now = $now ?: Carbon::now();
-
-        // If no date range configured, treat discount as always active (backwards compatible)
-        if (!$this->discount_start_date && !$this->discount_end_date) {
-            return true;
-        }
-
-        $start = $this->discount_start_date ? Carbon::parse($this->discount_start_date)->startOfDay() : null;
-        $end = $this->discount_end_date ? Carbon::parse($this->discount_end_date)->endOfDay() : null;
-
-        if ($start && $now->lt($start)) {
-            return false;
-        }
-
-        if ($end && $now->gt($end)) {
-            return false;
-        }
-
-        return true;
+        return $activeDiscount !== null;
     }
 
     /**
@@ -90,7 +72,7 @@ class Product extends Model
     }
 
     /**
-     * Get the user who created the product.
+     * Get the user who created this product.
      */
     public function creator(): BelongsTo
     {
@@ -98,7 +80,7 @@ class Product extends Model
     }
 
     /**
-     * Get the user who last updated the product.
+     * Get the user who last updated this product.
      */
     public function updater(): BelongsTo
     {
@@ -114,19 +96,31 @@ class Product extends Model
     }
 
     /**
-     * Get all variations for this product.
+     * Get all discounts for this product.
      */
-    public function variations(): HasMany
+    public function discounts(): HasMany
     {
-        return $this->hasMany(ProductVariation::class);
+        return $this->hasMany(ProductDiscount::class);
     }
 
+
     /**
-     * Get only active (enabled) variations for this product.
+     * Get active discount for this product.
      */
-    public function activeVariations(): HasMany
+    public function activeDiscount(): ?ProductDiscount
     {
-        return $this->hasMany(ProductVariation::class)->where('enabled', true);
+        $now = Carbon::now();
+        return $this->discounts()
+            ->where('status', 'active')
+            ->where(function ($query) use ($now) {
+                $query->whereNull('start_date')
+                    ->orWhere('start_date', '<=', $now)
+                    ->where(function ($q) use ($now) {
+                        $q->whereNull('end_date')
+                            ->orWhere('end_date', '>=', $now);
+                    });
+            })
+            ->first();
     }
 
     /**
@@ -148,17 +142,18 @@ class Product extends Model
      */
     public function getSellingPriceAttribute(): float
     {
-        $originalPrice = (float) $this->original_price;
+        $regularPrice = (float) $this->regular_price;
+        $discount = $this->activeDiscount();
 
-        if (!$this->isDiscountActive()) {
-            return $originalPrice;
+        if (!$discount) {
+            return $regularPrice;
         }
 
-        if ($this->discount_type === 'percentage') {
-            $discountAmount = $originalPrice * ((float) $this->discount_value / 100);
-            $sellingPrice = $originalPrice - $discountAmount;
+        if ($discount->discount_type === 'percentage') {
+            $discountAmount = $regularPrice * ((float) $discount->discount_value / 100);
+            $sellingPrice = $regularPrice - $discountAmount;
         } else { // fixed
-            $sellingPrice = $originalPrice - (float) $this->discount_value;
+            $sellingPrice = $regularPrice - (float) $discount->discount_value;
         }
 
         return max(0, round($sellingPrice, 2));
@@ -169,17 +164,19 @@ class Product extends Model
      */
     public function getDiscountAmountAttribute(): float
     {
-        if (!$this->isDiscountActive()) {
+        $discount = $this->activeDiscount();
+        
+        if (!$discount) {
             return 0;
         }
 
-        $originalPrice = (float) $this->original_price;
+        $regularPrice = (float) $this->regular_price;
 
-        if ($this->discount_type === 'percentage') {
-            return round($originalPrice * ((float) $this->discount_value / 100), 2);
+        if ($discount->discount_type === 'percentage') {
+            return round($regularPrice * ((float) $discount->discount_value / 100), 2);
         }
 
-        return round((float) $this->discount_value, 2);
+        return round((float) $discount->discount_value, 2);
     }
 
     /**
@@ -187,22 +184,24 @@ class Product extends Model
      */
     public function getDiscountPercentageAttribute(): float
     {
-        if (!$this->isDiscountActive()) {
+        $discount = $this->activeDiscount();
+        
+        if (!$discount) {
             return 0;
         }
 
-        $originalPrice = (float) $this->original_price;
+        $regularPrice = (float) $this->regular_price;
 
-        if ($originalPrice == 0) {
+        if ($regularPrice == 0) {
             return 0;
         }
 
-        if ($this->discount_type === 'percentage') {
-            return round((float) $this->discount_value, 2);
+        if ($discount->discount_type === 'percentage') {
+            return round((float) $discount->discount_value, 2);
         }
 
         // Calculate percentage from fixed discount
-        return round(($this->discount_amount / $originalPrice) * 100, 2);
+        return round(($this->discount_amount / $regularPrice) * 100, 2);
     }
 
     /**
@@ -214,11 +213,11 @@ class Product extends Model
     }
 
     /**
-     * Scope a query to only include enabled products.
+     * Scope a query to only include active products.
      */
     public function scopeEnabled($query)
     {
-        return $query->where('enabled', true);
+        return $query->where('status', 'active');
     }
 
     /**
@@ -265,24 +264,40 @@ class Product extends Model
     }
 
     /**
-     * Scope a query to filter products with discount.
+     * Scope a query to filter products with active discount.
      */
     public function scopeWithDiscount($query)
     {
-        return $query->where('discount_type', '!=', 'none')
-            ->whereNotNull('discount_value')
-            ->where('discount_value', '>', 0);
+        $now = Carbon::now();
+        return $query->whereHas('discounts', function ($q) use ($now) {
+            $q->where('status', 'active')
+                ->where(function ($query) use ($now) {
+                    $query->whereNull('start_date')
+                        ->orWhere('start_date', '<=', $now)
+                        ->where(function ($q) use ($now) {
+                            $q->whereNull('end_date')
+                                ->orWhere('end_date', '>=', $now);
+                        });
+                });
+        });
     }
 
     /**
-     * Scope a query to filter products without discount.
+     * Scope a query to filter products without active discount.
      */
     public function scopeWithoutDiscount($query)
     {
-        return $query->where(function ($q) {
-            $q->where('discount_type', 'none')
-                ->orWhereNull('discount_value')
-                ->orWhere('discount_value', '<=', 0);
+        $now = Carbon::now();
+        return $query->whereDoesntHave('discounts', function ($q) use ($now) {
+            $q->where('status', 'active')
+                ->where(function ($query) use ($now) {
+                    $query->whereNull('start_date')
+                        ->orWhere('start_date', '<=', $now)
+                        ->where(function ($q) use ($now) {
+                            $q->whereNull('end_date')
+                                ->orWhere('end_date', '>=', $now);
+                        });
+                });
         });
     }
 
@@ -300,42 +315,4 @@ class Product extends Model
         };
     }
 
-    /**
-     * Check if product has variations.
-     */
-    public function hasVariations(): bool
-    {
-        return $this->variations()->exists();
-    }
-
-    /**
-     * Get the cheapest variation for this product.
-     */
-    public function getCheapestVariation(): ?ProductVariation
-    {
-        return $this->activeVariations()->orderBy('price', 'asc')->first();
-    }
-
-    /**
-     * Get price range accessor (e.g., "₹5.00 - ₹35.00" or single price if all same).
-     */
-    public function getPriceRangeAttribute(): ?string
-    {
-        $variations = $this->activeVariations()->get();
-        
-        if ($variations->isEmpty()) {
-            // Fallback to original_price if no variations
-            return '₹' . number_format((float) $this->original_price, 2);
-        }
-
-        $prices = $variations->pluck('price')->map(fn($price) => (float) $price);
-        $minPrice = $prices->min();
-        $maxPrice = $prices->max();
-
-        if ($minPrice === $maxPrice) {
-            return '₹' . number_format($minPrice, 2);
-        }
-
-        return '₹' . number_format($minPrice, 2) . ' - ₹' . number_format($maxPrice, 2);
-    }
 }

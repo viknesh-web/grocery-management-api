@@ -25,7 +25,7 @@ class BulkPriceUpdateRequest extends FormRequest
         return [
             'updates' => ['required', 'array', 'min:1'],
             'updates.*.product_id' => ['required', 'integer', 'exists:products,id'],
-            'updates.*.original_price' => ['nullable', 'numeric', 'min:0'],
+            'updates.*.regular_price' => ['nullable', 'numeric', 'min:0'],
             'updates.*.discount_type' => ['nullable', 'string', 'in:none,percentage,fixed'],
             'updates.*.discount_value' => ['nullable', 'numeric', 'min:0'],
             'updates.*.stock_quantity' => ['nullable', 'numeric', 'min:0'],

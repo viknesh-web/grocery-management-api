@@ -20,7 +20,6 @@ class DatabaseSeeder extends Seeder
             'name' => 'Admin User',
             'email' => 'admin@example.com',
             'password' => bcrypt('password'),
-            'role' => 'admin',
         ]);
 
         // Seed in order: Categories -> Products -> Customers -> Price Updates
@@ -28,7 +27,6 @@ class DatabaseSeeder extends Seeder
             CategorySeeder::class,
             ProductSeeder::class,
             CustomerSeeder::class,
-            PriceUpdateSeeder::class,
         ]);
     }
 }

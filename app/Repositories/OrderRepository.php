@@ -10,7 +10,7 @@ class OrderRepository
 {
     public function getEnabledProductsWithCategories(): Collection
     {
-        return Product::with('category')->where('enabled', true)->get();
+        return Product::with('category')->where('status', 'active')->get();
     }
 
     public function getCategoriesOrdered(): Collection

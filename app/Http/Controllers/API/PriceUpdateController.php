@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\API\V1;
+namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\PriceUpdate\BulkPriceUpdateRequest;
@@ -29,7 +29,7 @@ class PriceUpdateController extends Controller
      */
     public function getProducts(Request $request): JsonResponse
     {
-        $query = Product::enabled();
+        $query = Product::where('status', 'active');
 
         // Search
         if ($request->has('search')) {

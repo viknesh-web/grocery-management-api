@@ -27,7 +27,7 @@ class CustomerService
      */
     public function getPaginated(array $filters = [], int $perPage = 15): \Illuminate\Contracts\Pagination\LengthAwarePaginator
     {
-        $relations = ['creator:id,name,email', 'updater:id,name,email'];
+        $relations = [];
         return $this->repository->paginate($filters, $perPage, $relations);
     }
 
@@ -39,7 +39,7 @@ class CustomerService
      */
     public function find(int $id): ?Customer
     {
-        $relations = ['creator:id,name,email', 'updater:id,name,email'];
+        $relations = [];
         return $this->repository->find($id, $relations);
     }
 
@@ -54,9 +54,6 @@ class CustomerService
     {
         DB::beginTransaction();
         try {
-            $data['created_by'] = $userId;
-            $data['updated_by'] = $userId;
-
             $customer = $this->repository->create($data);
 
             DB::commit();
@@ -79,8 +76,6 @@ class CustomerService
     {
         DB::beginTransaction();
         try {
-            $data['updated_by'] = $userId;
-
             $this->repository->update($customer, $data);
             $customer->refresh();
 
@@ -121,9 +116,9 @@ class CustomerService
      */
     public function toggleStatus(Customer $customer, int $userId): Customer
     {
+        $newStatus = $customer->status === 'active' ? 'inactive' : 'active';
         $this->repository->update($customer, [
-            'active' => !$customer->active,
-            'updated_by' => $userId,
+            'status' => $newStatus,
         ]);
 
         return $customer->fresh();

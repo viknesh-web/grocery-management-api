@@ -13,25 +13,27 @@ class PriceUpdate extends Model
 
     protected $fillable = [
         'product_id',
-        'old_original_price',
-        'new_original_price',
+        'old_regular_price',
+        'new_regular_price',
         'old_discount_type',
         'new_discount_type',
         'old_discount_value',
         'new_discount_value',
         'old_stock_quantity',
         'new_stock_quantity',
-        'updated_by',
+        'old_selling_price',
         'new_selling_price',
+        'updated_by',
     ];
 
     protected $casts = [
-        'old_original_price' => 'decimal:2',
-        'new_original_price' => 'decimal:2',
+        'old_regular_price' => 'decimal:2',
+        'new_regular_price' => 'decimal:2',
         'old_discount_value' => 'decimal:2',
         'new_discount_value' => 'decimal:2',
         'old_stock_quantity' => 'decimal:2',
         'new_stock_quantity' => 'decimal:2',
+        'old_selling_price' => 'decimal:2',
         'new_selling_price' => 'decimal:2',
     ];
 
@@ -49,29 +51,33 @@ class PriceUpdate extends Model
 
     public function getPriceChangePercentageAttribute(): ?float
     {
-        if (!$this->old_original_price || $this->old_original_price == 0) {
-            return null;
+        // Use stored selling prices if available, otherwise calculate
+        $oldSellingPrice = $this->old_selling_price;
+        $newSellingPrice = $this->new_selling_price;
+
+        // If old_selling_price not stored, calculate from old_regular_price
+        if ($oldSellingPrice === null && $this->old_regular_price) {
+            $oldSellingPrice = $this->old_regular_price;
+            if ($this->old_discount_type === 'percentage' && $this->old_discount_value !== null) {
+                $oldSellingPrice -= ($this->old_regular_price * $this->old_discount_value / 100);
+            } elseif ($this->old_discount_type === 'fixed' && $this->old_discount_value !== null) {
+                $oldSellingPrice -= $this->old_discount_value;
+            }
+            $oldSellingPrice = max(0, round($oldSellingPrice, 2));
         }
 
-        // Calculate old selling price
-        $oldSellingPrice = $this->old_original_price;
-        if ($this->old_discount_type === 'percentage' && $this->old_discount_value !== null) {
-            $oldSellingPrice -= ($this->old_original_price * $this->old_discount_value / 100);
-        } elseif ($this->old_discount_type === 'fixed' && $this->old_discount_value !== null) {
-            $oldSellingPrice -= $this->old_discount_value;
+        // If new_selling_price not stored, calculate from new_regular_price
+        if ($newSellingPrice === null && $this->new_regular_price) {
+            $newSellingPrice = $this->new_regular_price;
+            if ($this->new_discount_type === 'percentage' && $this->new_discount_value !== null) {
+                $newSellingPrice -= ($this->new_regular_price * $this->new_discount_value / 100);
+            } elseif ($this->new_discount_type === 'fixed' && $this->new_discount_value !== null) {
+                $newSellingPrice -= $this->new_discount_value;
+            }
+            $newSellingPrice = max(0, round($newSellingPrice, 2));
         }
-        $oldSellingPrice = max(0, round($oldSellingPrice, 2));
 
-        // Calculate new selling price
-        $newSellingPrice = $this->new_original_price;
-        if ($this->new_discount_type === 'percentage' && $this->new_discount_value !== null) {
-            $newSellingPrice -= ($this->new_original_price * $this->new_discount_value / 100);
-        } elseif ($this->new_discount_type === 'fixed' && $this->new_discount_value !== null) {
-            $newSellingPrice -= $this->new_discount_value;
-        }
-        $newSellingPrice = max(0, round($newSellingPrice, 2));
-
-        if ($oldSellingPrice == 0) {
+        if (!$oldSellingPrice || $oldSellingPrice == 0) {
             return null; // Avoid division by zero
         }
 
