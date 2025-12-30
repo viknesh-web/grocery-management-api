@@ -49,7 +49,7 @@ class WhatsAppController extends Controller
     /**
      * Generate price list PDF.
      */
-    public function generatePriceList(Request $request): JsonResponse
+    public function generatePriceList(Request $request)
     {
         $request->validate([
             'product_ids' => ['sometimes', 'array'],
@@ -75,7 +75,7 @@ class WhatsAppController extends Controller
     /**
      * Send WhatsApp message to customers.
      */
-    public function sendMessage(Request $request): JsonResponse
+    public function sendMessage(Request $request)
     {
         // Handle JSON-encoded arrays from FormData
         $pdfType = $request->get('pdf_type', 'regular');
@@ -275,7 +275,7 @@ class WhatsAppController extends Controller
     /**
      * Send WhatsApp update with product selection (no customer selection).
      */
-    public function sendProductUpdate(Request $request): JsonResponse
+    public function sendProductUpdate(Request $request)
     {
         // Normalize JSON-encoded fields that may be sent as strings via FormData
         $this->normalizeJsonFields($request, ['product_ids', 'product_types', 'content_variables']);
@@ -354,7 +354,7 @@ class WhatsAppController extends Controller
     /**
      * Send test message to a single customer.
      */
-    public function sendTestMessage(Request $request, Customer $customer): JsonResponse
+    public function sendTestMessage(Request $request, Customer $customer)
     {
         $request->validate([
             'message' => ['nullable', 'string', 'max:1000'],
@@ -380,7 +380,7 @@ class WhatsAppController extends Controller
     /**
      * Validate WhatsApp number format.
      */
-    public function validateNumber(Request $request): JsonResponse
+    public function validateNumber(Request $request)
     {
         $request->validate([
             'phone_number' => ['required', 'string'],

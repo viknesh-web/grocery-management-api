@@ -17,7 +17,7 @@ class ProductController extends Controller
         private ProductService $productService
     ) {}
 
-    public function index(Request $request): JsonResponse
+    public function index(Request $request)
     {
         $validator = Validator::make($request->all(), ProductValidator::onIndex());
         $validator->validate();
@@ -63,7 +63,7 @@ class ProductController extends Controller
         return response()->json($response, 200);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request)
     {
         if ($request->has('enabled')) {
             $request->merge(['enabled' => $request->boolean('enabled')]);
@@ -88,7 +88,7 @@ class ProductController extends Controller
         }
     }
 
-    public function show(Request $request): JsonResponse
+    public function show(Request $request)
     {
         $product = $request->get('product');
         $product->load(['creator', 'updater', 'category']);
@@ -98,7 +98,7 @@ class ProductController extends Controller
         ]);
     }
 
-    public function update(Request $request): JsonResponse
+    public function update(Request $request)
     {
         $product = $request->get('product');
         
@@ -125,7 +125,7 @@ class ProductController extends Controller
         }
     }
 
-    public function destroy(Request $request): JsonResponse
+    public function destroy(Request $request)
     {
         $product = $request->get('product');
 
@@ -143,7 +143,7 @@ class ProductController extends Controller
         }
     }
 
-    public function toggleStatus(Request $request): JsonResponse
+    public function toggleStatus(Request $request)
     {
         $product = $request->get('product');
         $product = $this->productService->toggleStatus($product, $request->user()->id);

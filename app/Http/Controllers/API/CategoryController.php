@@ -36,7 +36,7 @@ class CategoryController extends Controller
         return new CategoryCollection($categories);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request)
     {
         if ($request->has('is_active')) {
             $request->merge(['is_active' => $request->boolean('is_active')]);
@@ -54,14 +54,14 @@ class CategoryController extends Controller
                 'data' => $category,
             ];
 
-            return response()->json($response, 201);
+            return response()->json($response);
         } catch (\Exception $e) {
             report($e);
             throw new \Exception("Unable to create category");
         }
     }
 
-    public function show(Request $request): JsonResponse
+    public function show(Request $request)
     {
         $category = $request->get('category');
         $category->load(['creator', 'updater', 'parent']);
@@ -71,7 +71,7 @@ class CategoryController extends Controller
         ]);
     }
 
-    public function update(Request $request): JsonResponse
+    public function update(Request $request)
     {
         $category = $request->get('category');
         
@@ -99,7 +99,7 @@ class CategoryController extends Controller
         }
     }
 
-    public function destroy(Request $request): JsonResponse
+    public function destroy(Request $request)
     {
         $category = $request->get('category');
 
@@ -118,7 +118,7 @@ class CategoryController extends Controller
         }
     }
 
-    public function toggleStatus(Request $request): JsonResponse
+    public function toggleStatus(Request $request)
     {
         $category = $request->get('category');
         $category = $this->categoryService->toggleStatus($category, $request->user()->id);
@@ -131,7 +131,7 @@ class CategoryController extends Controller
         return response()->json($response);
     }
 
-    public function reorder(Request $request): JsonResponse
+    public function reorder(Request $request)
     {
         // Display order is no longer supported in the schema
         // This endpoint is kept for API compatibility but does nothing
@@ -142,7 +142,7 @@ class CategoryController extends Controller
         return response()->json($response);
     }
 
-    public function search(Request $request, string $query): JsonResponse
+    public function search(Request $request, string $query)
     {
         $categories = $this->categoryService->search($query);
 
@@ -151,7 +151,7 @@ class CategoryController extends Controller
         ]);
     }
 
-    public function tree(Request $request): JsonResponse
+    public function tree(Request $request)
     {
         $categories = $this->categoryService->getTree();
         

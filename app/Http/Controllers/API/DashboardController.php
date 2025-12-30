@@ -20,7 +20,7 @@ class DashboardController extends Controller
     /**
      * Get dashboard statistics.
      */
-    public function index(Request $request): JsonResponse
+    public function index(Request $request)
     {
         $totalProducts = Product::count();
         $activeProducts = Product::where('status', 'active')->count();

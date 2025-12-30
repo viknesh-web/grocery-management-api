@@ -33,7 +33,7 @@ class CustomerController extends Controller
         return new CustomerCollection($customers);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request)
     {
         $validator = Validator::make($request->all(), CustomerValidator::onCreate(), CustomerValidator::messages());
         $data = $validator->validate();
@@ -54,7 +54,7 @@ class CustomerController extends Controller
         }
     }
 
-    public function show(Customer $customer): JsonResponse
+    public function show(Customer $customer)
     {
         $customer = $this->customerService->find($customer->id);
 
@@ -69,7 +69,7 @@ class CustomerController extends Controller
         ], 200);
     }
 
-    public function update(Request $request, Customer $customer): JsonResponse
+    public function update(Request $request, Customer $customer)
     {
         $validator = Validator::make($request->all(), CustomerValidator::onUpdate($customer->id), CustomerValidator::messages());
         $data = $validator->validate();
@@ -92,7 +92,7 @@ class CustomerController extends Controller
         }
     }
 
-    public function destroy(Customer $customer): JsonResponse
+    public function destroy(Customer $customer)
     {
         try {
             $this->customerService->delete($customer);
@@ -104,7 +104,7 @@ class CustomerController extends Controller
         }
     }
 
-    public function toggleStatus(Request $request, Customer $customer): JsonResponse
+    public function toggleStatus(Request $request, Customer $customer)
     {
         $customer = $this->customerService->toggleStatus($customer, $request->user()->id);
 

@@ -27,7 +27,7 @@ class PriceUpdateController extends Controller
     /**
      * Get all products for price updates.
      */
-    public function getProducts(Request $request): JsonResponse
+    public function getProducts(Request $request)
     {
         $query = Product::where('status', 'active');
 
@@ -68,7 +68,7 @@ class PriceUpdateController extends Controller
             }
         }
 
-        $products = $query->with(['category:id,name,slug'])->orderBy('name')->get();
+        $products = $query->with(['category:id,name'])->orderBy('name')->get();
         
         return response()->json([
             'data' => $products
@@ -78,7 +78,7 @@ class PriceUpdateController extends Controller
     /**
      * Bulk update product prices.
      */
-    public function bulkUpdate(BulkPriceUpdateRequest $request): JsonResponse
+    public function bulkUpdate(BulkPriceUpdateRequest $request)
     {
         $result = $this->priceUpdateService->bulkUpdatePrices(
             $request->validated()['updates'],
@@ -102,7 +102,7 @@ class PriceUpdateController extends Controller
     /**
      * Get price update history for a product.
      */
-    public function productHistory(Request $request, Product $product): JsonResponse
+    public function productHistory(Request $request, Product $product)
     {
         $limit = $request->get('limit', 50);
         $history = $this->priceUpdateService->getProductPriceHistory($product->id, $limit);
@@ -118,7 +118,7 @@ class PriceUpdateController extends Controller
     /**
      * Get price updates by date range.
      */
-    public function byDateRange(Request $request): JsonResponse
+    public function byDateRange(Request $request)
     {
         $request->validate([
             'start_date' => ['required', 'date'],
@@ -138,7 +138,7 @@ class PriceUpdateController extends Controller
     /**
      * Get recent price updates.
      */
-    public function recent(Request $request): JsonResponse
+    public function recent(Request $request)
     {
         $limit = $request->get('limit', 20);
         $updates = PriceUpdate::with(['product', 'updater'])->orderBy('created_at', 'desc')->limit($limit)->get();

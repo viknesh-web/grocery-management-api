@@ -25,7 +25,7 @@ class AddressController extends Controller
     /**
      * Search UAE areas using Nominatim API.
      */
-    public function searchUAE(Request $request): JsonResponse
+    public function searchUAE(Request $request)
     {
         $validated = $request->validate([
             'query' => ['required', 'string', 'max:100'],

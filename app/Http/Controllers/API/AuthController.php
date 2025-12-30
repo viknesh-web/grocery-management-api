@@ -19,7 +19,7 @@ class AuthController extends Controller
     /**
      * Register a new admin user.
      */
-    public function register(Request $request): JsonResponse
+    public function register(Request $request)
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -52,7 +52,7 @@ class AuthController extends Controller
     /**
      * Login user and return token.
      */
-    public function login(Request $request): JsonResponse
+    public function login(Request $request)
     {
         $request->validate([
             'email' => ['required', 'email'],
@@ -86,7 +86,7 @@ class AuthController extends Controller
     /**
      * Get the authenticated user.
      */
-    public function user(Request $request): JsonResponse
+    public function user(Request $request)
     {
         return response()->json([
             'data' => [
@@ -102,7 +102,7 @@ class AuthController extends Controller
     /**
      * Update the authenticated user's profile.
      */
-    public function updateProfile(Request $request): JsonResponse
+    public function updateProfile(Request $request)
     {
         $user = $request->user();
 
@@ -131,7 +131,7 @@ class AuthController extends Controller
     /**
      * Logout the authenticated user.
      */
-    public function logout(Request $request): JsonResponse
+    public function logout(Request $request)
     {
         $request->user()->currentAccessToken()->delete();
 
