@@ -4,7 +4,6 @@ namespace App\Http\Controllers\API\V1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\PriceUpdate\BulkPriceUpdateRequest;
-use App\Http\Resources\PriceUpdate\PriceUpdateResource;
 use App\Models\PriceUpdate;
 use App\Models\Product;
 use App\Services\PriceUpdateService;
@@ -70,37 +69,9 @@ class PriceUpdateController extends Controller
         }
 
         $products = $query->with(['category:id,name,slug'])->orderBy('name')->get();
-        $data = $products->map(function ($product) {
-                $discountActive = $product->isDiscountActive();
-                return [
-                    'id' => $product->id,
-                    'name' => $product->name,
-                    'item_code' => $product->item_code,
-                    'image_url' => $product->image_url,
-                    'original_price' => (float) $product->original_price,
-                    'discount_type' => $discountActive ? $product->discount_type : 'none',
-                    'discount_value' => $discountActive && $product->discount_value
-                        ? (float) $product->discount_value
-                        : null,
-                    'selling_price' => (float) $product->selling_price,
-                    'stock_quantity' => (float) $product->stock_quantity,
-                    'stock_unit' => $product->stock_unit,
-                    'product_type' => $product->product_type,
-                    'category' => $product->category ? [
-                        'id' => $product->category->id,
-                        'name' => $product->category->name,
-                    ] : null,
-                    // Keep current_* fields for backward compatibility if needed
-                    'current_original_price' => (float) $product->original_price,
-                    'current_discount_type' => $product->discount_type,
-                    'current_discount_value' => $product->discount_value ? (float) $product->discount_value : null,
-                    'current_selling_price' => (float) $product->selling_price,
-                    'current_stock_quantity' => (float) $product->stock_quantity,
-                ];
-            });
         
         return response()->json([
-            'data' => $data
+            'data' => $products
         ], 200);
     }
 
@@ -138,12 +109,8 @@ class PriceUpdateController extends Controller
 
         return response()->json([
             'data' => [
-                'product' => [
-                    'id' => $product->id,
-                    'name' => $product->name,
-                    'item_code' => $product->item_code,
-                ],
-                'history' => PriceUpdateResource::collection($history),
+                'product' => $product,
+                'history' => $history,
             ],
         ], 200);
     }
@@ -164,7 +131,7 @@ class PriceUpdateController extends Controller
         );
 
         return response()->json([
-            'data' => PriceUpdateResource::collection($updates),
+            'data' => $updates,
         ], 200);
     }
 
@@ -174,10 +141,10 @@ class PriceUpdateController extends Controller
     public function recent(Request $request): JsonResponse
     {
         $limit = $request->get('limit', 20);
-        $updates = PriceUpdate::with(['product:id,name,item_code', 'updater:id,name,email'])->orderBy('created_at', 'desc')->limit($limit)->get();
+        $updates = PriceUpdate::with(['product', 'updater'])->orderBy('created_at', 'desc')->limit($limit)->get();
 
         return response()->json([
-            'data' => PriceUpdateResource::collection($updates),
+            'data' => $updates,
         ], 200);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\MessageException;
 use App\Models\Product;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Log;
@@ -20,10 +21,8 @@ class PdfService
 
         $products = $query->orderBy('category_id')->orderBy('name')->get();
 
-        // Determine which blade template to use based on layout
         $viewName = ($pdfLayout === 'catalog') ? 'pdfs.catalog-price-list' : 'pdfs.generate';
 
-        // Prepare data based on layout
         if ($pdfLayout === 'catalog') {
             $data = [
                 'products' => $products,
@@ -50,15 +49,13 @@ class PdfService
             mkdir($directory, 0755, true);
         }
 
-        // Store PDF
         $disk->put($path, $pdf->output(), 'public');
 
-        // Final verification
         if (!$disk->exists($path)) {
-            throw new \RuntimeException('Failed to store price list PDF');
+            throw new MessageException('Failed to store price list PDF');
         }
 
-        return $path; // return relative media path (pdfs/xxx.pdf)
+        return $path;
     }
 
     public function getPdfUrl(string $pdfPath): string

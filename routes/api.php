@@ -9,7 +9,6 @@ use App\Http\Controllers\API\V1\PriceUpdateController;
 use App\Http\Controllers\API\V1\ProductController;
 use App\Http\Controllers\API\V1\WhatsAppController;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Log;
 
 
 
@@ -24,25 +23,19 @@ use Illuminate\Support\Facades\Log;
 |
 */
 
-// Public routes
 Route::prefix('v1')->group(function () {
-    // Authentication routes
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
 });
 
-// Protected routes
 Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
-    // Auth routes
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
     Route::put('/user/profile', [AuthController::class, 'updateProfile']);
 
-    // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index']);
 
-    // Categories
-    Route::group(['prefix' => 'categories'], function () {
+    Route::prefix('categories')->middleware([\App\Http\Middleware\CheckCategory::class])->group(function () {
         Route::get('/', [CategoryController::class, 'index']);
         Route::post('/', [CategoryController::class, 'store']);
         Route::post('/reorder', [CategoryController::class, 'reorder']);
@@ -57,8 +50,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         });
     });
 
-    // Products
-    Route::group(['prefix' => 'products'], function () {
+    Route::prefix('products')->middleware([\App\Http\Middleware\CheckProduct::class])->group(function () {
         Route::get('/', [ProductController::class, 'index']);
         Route::post('/', [ProductController::class, 'store']);
         Route::group(['prefix' => '/{product}'], function () {
@@ -70,8 +62,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         });
     });
 
-    // Customers
-    Route::group(['prefix' => 'customers'], function () {
+    Route::prefix('customers')->middleware([\App\Http\Middleware\CheckCustomer::class])->group(function () {
         Route::get('/', [CustomerController::class, 'index']);
         Route::post('/', [CustomerController::class, 'store']);
         Route::group(['prefix' => '/{customer}'], function () {
@@ -82,29 +73,24 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         });
     });
 
-    // Addresses (feature-flagged)
     if (config('features.address_field')) {
         Route::apiResource('addresses', AddressController::class);
     }
 
-    // UAE Address Search (always available, not feature-flagged)
     Route::get('/addresses/search-uae', [AddressController::class, 'searchUAE']);
 
-    // Price Updates
     Route::get('/price-updates/products', [PriceUpdateController::class, 'getProducts']);
     Route::post('/price-updates/bulk-update', [PriceUpdateController::class, 'bulkUpdate']);
-    Route::get('/price-updates/product/{product}/history', [PriceUpdateController::class, 'productHistory']);
+    Route::get('/price-updates/product/{product}/history', [PriceUpdateController::class, 'productHistory'])->middleware(\App\Http\Middleware\CheckProduct::class);
     Route::get('/price-updates/by-date-range', [PriceUpdateController::class, 'byDateRange']);
     Route::get('/price-updates/recent', [PriceUpdateController::class, 'recent']);
 
-    // WhatsApp
     Route::post('/whatsapp/generate-price-list', [WhatsAppController::class, 'generatePriceList']);
     Route::post('/whatsapp/send-message', [WhatsAppController::class, 'sendMessage']);
     Route::post('/whatsapp/send-product-update', [WhatsAppController::class, 'sendProductUpdate']);
-    Route::post('/whatsapp/test-message/{customer}', [WhatsAppController::class, 'sendTestMessage']);
+    Route::post('/whatsapp/test-message/{customer}', [WhatsAppController::class, 'sendTestMessage'])->middleware(\App\Http\Middleware\CheckCustomer::class);
     Route::post('/whatsapp/validate-number', [WhatsAppController::class, 'validateNumber']);
 
 });
-// Order form routes are handled by web routes (routes/web.php)
 
 

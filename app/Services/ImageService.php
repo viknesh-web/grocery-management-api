@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\MessageException;
 use App\Models\Category;
 use App\Models\Customer;
 use Illuminate\Http\UploadedFile;
@@ -44,37 +45,32 @@ class ImageService
         }
 
         try {
-            // Read from uploaded file directly (not from storage)
             $image = $this->image
                 ->read($file->getRealPath())
                 ->resize(800, 800, fn ($c) => $c->aspectRatio());
 
-            // Store the processed image
             $disk->put($path, (string) $image->encode(), 'public');
 
-            // Verify the file was stored
             if (!$disk->exists($path)) {
-                throw new \RuntimeException('Failed to store product image');
+                throw new MessageException('Failed to store product image');
             }
         } catch (\Throwable $e) {
-            // If resize/encode fails, fallback to storing original file
             report($e);
             try {
                 $disk->putFileAs('products', $file, $filename, 'public');
                 
                 // Verify the file was stored
                 if (!$disk->exists($path)) {
-                    throw new \RuntimeException('Failed to store product image');
+                    throw new MessageException('Failed to store product image');
                 }
             } catch (\Throwable $fallbackError) {
                 report($fallbackError);
-                throw new \RuntimeException('Failed to store product image: ' . $fallbackError->getMessage());
+                throw new MessageException('Failed to store product image: ' . $fallbackError->getMessage());
             }
         }
 
-        // Final verification
         if (!$disk->exists($path)) {
-            throw new \RuntimeException('Product image was not saved correctly');
+            throw new MessageException('Product image was not saved correctly');
         }
 
         return $path;
@@ -91,44 +87,34 @@ class ImageService
         $filename = uniqid() . '_' . time() . '.' . $file->getClientOriginalExtension();
         $path = 'category/' . $filename;
 
-        // Ensure the category directory exists
         $directory = $media->path('category');
         if (!is_dir($directory)) {
             mkdir($directory, 0755, true);
         }
 
         try {
-            // Read from uploaded file directly (not from storage)
-            $image = $this->image
-                ->read($file->getRealPath())
-                ->resize(800, 800, fn ($c) => $c->aspectRatio());
+            $image = $this->image->read($file->getRealPath())->resize(800, 800, fn ($c) => $c->aspectRatio());
 
-            // Store the processed image
             $media->put($path, (string) $image->encode(), 'public');
-
-            // Verify the file was stored
             if (!$media->exists($path)) {
-                throw new \RuntimeException('Failed to store category image');
+                throw new MessageException('Failed to store category image');
             }
         } catch (\Throwable $e) {
-            // If resize/encode fails, fallback to storing original file
             report($e);
             try {
                 $media->putFileAs('category', $file, $filename, 'public');
 
-                // Verify the file was stored
                 if (!$media->exists($path)) {
-                    throw new \RuntimeException('Failed to store category image');
+                    throw new MessageException('Failed to store category image');
                 }
             } catch (\Throwable $fallbackError) {
                 report($fallbackError);
-                throw new \RuntimeException('Failed to store category image: ' . $fallbackError->getMessage());
+                throw new MessageException('Failed to store category image: ' . $fallbackError->getMessage());
             }
         }
 
-        // Final verification
         if (!$media->exists($path)) {
-            throw new \RuntimeException('Category image was not saved correctly');
+            throw new MessageException('Category image was not saved correctly');
         }
 
         return $path;

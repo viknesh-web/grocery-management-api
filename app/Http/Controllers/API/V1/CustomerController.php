@@ -5,7 +5,6 @@ namespace App\Http\Controllers\API\V1;
 use App\Helper\DataNormalizer;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Customer\CustomerCollection;
-use App\Http\Resources\Customer\CustomerResource;
 use App\Models\Customer;
 use App\Services\CustomerService;
 use App\Validator\CustomerValidator;
@@ -47,7 +46,7 @@ class CustomerController extends Controller
 
             return response()->json([
                 'message' => 'Customer created successfully',
-                'data' => new CustomerResource($customer),
+                'data' => $customer,
             ], 201);
         } catch (\Exception $e) {
             return response()->json([
@@ -68,7 +67,7 @@ class CustomerController extends Controller
         }
 
         return response()->json([
-            'data' => new CustomerResource($customer),
+            'data' => $customer,
         ], 200);
     }
 
@@ -87,7 +86,7 @@ class CustomerController extends Controller
 
             return response()->json([
                 'message' => 'Customer updated successfully',
-                'data' => new CustomerResource($customer),
+                'data' => $customer,
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
@@ -117,7 +116,7 @@ class CustomerController extends Controller
 
         return response()->json([
             'message' => 'Customer status updated successfully',
-            'data' => new CustomerResource($customer),
+            'data' => $customer,
         ], 200);
     }
 

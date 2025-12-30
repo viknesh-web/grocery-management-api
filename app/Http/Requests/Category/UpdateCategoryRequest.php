@@ -54,14 +54,8 @@ class UpdateCategoryRequest extends FormRequest
             $dataToMerge['description'] = trim((string) $this->description);
         }
 
-        // Normalize is_active (no default for updates)
         if ($this->has('is_active')) {
-            $isActiveValue = $this->is_active;
-            if (is_string($isActiveValue)) {
-                $dataToMerge['is_active'] = filter_var($isActiveValue, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false;
-            } else {
-                $dataToMerge['is_active'] = (bool) $isActiveValue;
-            }
+            $dataToMerge['is_active'] = $this->boolean('is_active');
         }
 
         // Normalize display_order (no default for updates)

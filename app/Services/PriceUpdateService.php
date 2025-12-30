@@ -100,12 +100,12 @@ class PriceUpdateService
 
     public function getProductPriceHistory(int $productId, int $limit = 50)
     {
-        return PriceUpdate::where('product_id', $productId)->with('updater:id,name,email')->orderBy('created_at', 'desc')->limit($limit)->get();
+        return PriceUpdate::where('product_id', $productId)->with('updater')->orderBy('created_at', 'desc')->limit($limit)->get();
     }
 
     public function getPriceUpdatesByDateRange(string $startDate, string $endDate)
     {
-        return PriceUpdate::dateRange($startDate, $endDate)->with(['product:id,name,item_code', 'updater:id,name,email'])->orderBy('created_at', 'desc')->get();
+        return PriceUpdate::dateRange($startDate, $endDate)->with(['product', 'updater'])->orderBy('created_at', 'desc')->get();
     }
 }
 

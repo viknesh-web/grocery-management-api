@@ -112,12 +112,7 @@ trait NormalizesInput
     protected function normalizeBoolean(array $input, string $key, array &$dataToMerge, $default = null): void
     {
         if (array_key_exists($key, $input)) {
-            $value = $input[$key];
-            if (is_string($value)) {
-                $dataToMerge[$key] = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? ($default ?? false);
-            } else {
-                $dataToMerge[$key] = (bool) $value;
-            }
+            $dataToMerge[$key] = (bool) $input[$key];
         } elseif ($default !== null) {
             $dataToMerge[$key] = $default;
         }

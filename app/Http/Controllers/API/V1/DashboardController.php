@@ -40,24 +40,7 @@ class DashboardController extends Controller
         $standardProducts = Product::where('product_type', 'standard')->count();
 
         // Recent price changes
-        $recentPriceChanges = PriceUpdate::with(['product:id,name,item_code'])
-            ->orderBy('created_at', 'desc')
-            ->limit(10)
-            ->get()
-            ->map(function ($update) {
-                return [
-                    'id' => $update->id,
-                    'product' => [
-                        'id' => $update->product->id,
-                        'name' => $update->product->name,
-                        'item_code' => $update->product->item_code,
-                    ],
-                    'old_original_price' => $update->old_original_price,
-                    'new_original_price' => $update->new_original_price,
-                    'price_change_percentage' => $update->price_change_percentage,
-                    'updated_at' => $update->created_at->toISOString(),
-                ];
-            });
+        $recentPriceChanges = PriceUpdate::with(['product'])->orderBy('created_at', 'desc')->limit(10)->get();
 
             $data = [
                 'statistics' => [

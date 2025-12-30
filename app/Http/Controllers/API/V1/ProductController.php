@@ -2,10 +2,9 @@
 
 namespace App\Http\Controllers\API\V1;
 
+use App\Exceptions\MessageException;
 use App\Helper\DataNormalizer;
 use App\Http\Controllers\Controller;
-use App\Http\Resources\Product\ProductCollection;
-use App\Http\Resources\Product\ProductResource;
 use App\Services\ProductService;
 use App\Validator\ProductValidator;
 use Illuminate\Http\JsonResponse;
@@ -37,15 +36,12 @@ class ProductController extends Controller
 
         $perPage = $request->get('per_page', 15);
         $products = $this->productService->getPaginated($filters, $perPage);
-
-        $collection = new ProductCollection($products);
-        $responseData = $collection->response()->getData(true);
         
         $filtersApplied = property_exists($products, 'filters_applied') ? $products->filters_applied : [];
         $totalFiltered = property_exists($products, 'total_filtered') ? $products->total_filtered : $products->total();
         
         $response = [
-            'data' => $responseData['data'],
+            'data' => $products->items(),
             'meta' => [
                 'current_page' => $products->currentPage(),
                 'from' => $products->firstItem(),
@@ -69,6 +65,10 @@ class ProductController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        if ($request->has('enabled')) {
+            $request->merge(['enabled' => $request->boolean('enabled')]);
+        }
+        
         $validator = Validator::make($request->all(), ProductValidator::onCreate());
         $data = $validator->validate();
         $data = DataNormalizer::normalizeProduct($data);
@@ -78,30 +78,34 @@ class ProductController extends Controller
             
             $response = [
                 'message' => 'Product created successfully',
-                'data' => new ProductResource($product),
+                'data' => $product,
             ];
 
             return response()->json($response, 201);
         } catch (\Exception $e) {
             report($e);
-            throw new \Exception("Unable to create product");
+            throw new MessageException("Unable to create product");
         }
     }
 
     public function show(Request $request): JsonResponse
     {
         $product = $request->get('product');
+        $product->load(['creator', 'updater', 'category']);
         
-        $response = [
-            'data' => new ProductResource($product),
-        ];
-
-        return response()->json($response);
+        return response()->json([
+            'data' => $product,
+        ]);
     }
 
     public function update(Request $request): JsonResponse
     {
         $product = $request->get('product');
+        
+        if ($request->has('enabled')) {
+            $request->merge(['enabled' => $request->boolean('enabled')]);
+        }
+        
         $validator = Validator::make($request->all(), ProductValidator::onUpdate($product->id));
         $data = $validator->validate();
         $data = DataNormalizer::normalizeProduct($data, $product->id);
@@ -111,13 +115,13 @@ class ProductController extends Controller
             
             $response = [
                 'message' => 'Product updated successfully',
-                'data' => new ProductResource($product),
+                'data' => $product,
             ];
 
             return response()->json($response);
         } catch (\Exception $e) {
             report($e);
-            throw new \Exception("Unable to update product");
+            throw new MessageException("Unable to update product");
         }
     }
 
@@ -135,7 +139,7 @@ class ProductController extends Controller
             return response()->json($response);
         } catch (\Exception $e) {
             report($e);
-            throw new \Exception("Unable to delete product");
+            throw new MessageException("Unable to delete product");
         }
     }
 
@@ -146,7 +150,7 @@ class ProductController extends Controller
         
         $response = [
             'message' => 'Product status updated successfully',
-            'data' => new ProductResource($product),
+            'data' => $product,
         ];
 
         return response()->json($response);
@@ -158,19 +162,7 @@ class ProductController extends Controller
         $variations = $product->activeVariations()->get();
         
         $response = [
-            'data' => $variations->map(function ($variation) {
-                return [
-                    'id' => $variation->id,
-                    'quantity' => $variation->quantity,
-                    'unit' => $variation->unit,
-                    'display_name' => $variation->display_name,
-                    'price' => $variation->price,
-                    'stock_quantity' => $variation->stock_quantity,
-                    'sku' => $variation->sku,
-                    'enabled' => $variation->enabled,
-                    'is_in_stock' => $variation->isInStock(),
-                ];
-            }),
+            'data' => $variations,
         ];
 
         return response()->json($response);

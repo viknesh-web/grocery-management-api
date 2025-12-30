@@ -10,10 +10,10 @@ class CheckCategory
 {
     public function handle($request, Closure $next)
     {
-        $categoryId = $request->route('category') ?? $request->input('id');
+        $categoryId = $request->route('category') ?? (isset($request->id) ? $request->id : null);
         
-        if ($categoryId && intval($categoryId)) {
-            $id = intval($categoryId);
+        if ($categoryId && (is_numeric($categoryId) || is_int($categoryId))) {
+            $id = is_int($categoryId) ? $categoryId : intval($categoryId);
             $item = Category::find($id);
             
             if (!$item) {

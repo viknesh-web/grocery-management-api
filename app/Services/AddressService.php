@@ -118,16 +118,10 @@ class AddressService
      */
     public function searchUAEAreas(string $query): array
     {
-        Log::debug('0');
-        
-        // if (strlen($query) < 3) {
-        //     return [];
-        // }
 
         $cacheKey = 'uae_areas:' . md5($query);
             
         try {
-            // Get API key from environment
             $apiKey = env('GEOAPIFY_API_KEY');
             
             if (empty($apiKey)) {
@@ -135,24 +129,18 @@ class AddressService
                 return [];
             }
             
-            // Build URL with query parameters for Geoapify
             $baseUrl = 'https://api.geoapify.com/v1/geocode/autocomplete';
             $params = http_build_query([
                 'text' => $query,
                 'apiKey' => $apiKey,
-                'filter' => 'countrycode:ae', // Restrict to UAE (ARE)
+                'filter' => 'countrycode:ae',
                 'limit' => 20
             ]);
             
             $url = $baseUrl . '?' . $params;
             
-            // Use cURL for direct control
             $ch = curl_init();
-            curl_setopt_array($ch, [
-                CURLOPT_URL => $url,
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => 10,
-                CURLOPT_FOLLOWLOCATION => true,
+            curl_setopt_array($ch, [CURLOPT_URL => $url, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10, CURLOPT_FOLLOWLOCATION => true,
                 CURLOPT_HTTPHEADER => [
                     'Accept: application/json',
                     'Accept-Language: en'
@@ -165,7 +153,6 @@ class AddressService
             curl_close($ch);
             
 
-            
             if ($error) {
                 Log::error('cURL Error: ' . $error);
                 return [];

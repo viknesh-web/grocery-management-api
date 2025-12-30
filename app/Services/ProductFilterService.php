@@ -32,16 +32,15 @@ class ProductFilterService
 
         // Status filter
         if (isset($filters['status'])) {
-            $enabled = filter_var($filters['status'], FILTER_VALIDATE_BOOLEAN);
+            $enabled = (bool) $filters['status'];
             $query->where('enabled', $enabled);
         } elseif (isset($filters['enabled'])) {
-            $enabled = filter_var($filters['enabled'], FILTER_VALIDATE_BOOLEAN);
+            $enabled = (bool) $filters['enabled'];
             $query->where('enabled', $enabled);
         }
 
-        // Has discount filter (date-range aware)
         if (isset($filters['has_discount'])) {
-            $hasDiscount = filter_var($filters['has_discount'], FILTER_VALIDATE_BOOLEAN);
+            $hasDiscount = (bool) $filters['has_discount'];
             $today = now()->toDateString();
 
             if ($hasDiscount) {

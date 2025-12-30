@@ -54,11 +54,7 @@ class DataNormalizer
         }
 
         if (isset($data['active'])) {
-            if (is_string($data['active'])) {
-                $data['active'] = filter_var($data['active'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? ($customerId === null ? true : false);
-            } else {
-                $data['active'] = (bool) $data['active'];
-            }
+            $data['active'] = (bool) $data['active'];
         } elseif ($customerId === null) {
             $data['active'] = true;
         }
@@ -85,11 +81,7 @@ class DataNormalizer
         }
 
         if (isset($data['is_active'])) {
-            if (is_string($data['is_active'])) {
-                $data['is_active'] = filter_var($data['is_active'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? ($categoryId === null ? true : false);
-            } else {
-                $data['is_active'] = (bool) $data['is_active'];
-            }
+            $data['is_active'] = (bool) $data['is_active'];
         } elseif ($categoryId === null) {
             $data['is_active'] = true;
         }
@@ -138,11 +130,7 @@ class DataNormalizer
         }
 
         if (isset($data['enabled'])) {
-            if (is_string($data['enabled'])) {
-                $data['enabled'] = filter_var($data['enabled'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? ($productId === null ? true : false);
-            } else {
-                $data['enabled'] = (bool) $data['enabled'];
-            }
+            $data['enabled'] = (bool) $data['enabled'];
         } elseif ($productId === null) {
             $data['enabled'] = true;
         }

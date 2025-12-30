@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\API\V1;
 
+use App\Exceptions\MessageException;
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Services\PdfService;
@@ -223,7 +224,7 @@ class WhatsAppController extends Controller
             
             // Verify file was stored
             if (!$disk->exists($path)) {
-                throw new \RuntimeException('Failed to store custom PDF file');
+                throw new MessageException('Failed to store custom PDF file');
             }
             
             // Get the URL using PdfService (uses media disk)

@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers\API\V1;
 
+use App\Exceptions\MessageException;
 use App\Helper\DataNormalizer;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Category\CategoryCollection;
-use App\Http\Resources\Category\CategoryResource;
 use App\Http\Resources\Product\ProductCollection;
 use App\Services\CategoryService;
 use App\Validator\CategoryValidator;
@@ -38,6 +38,10 @@ class CategoryController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        if ($request->has('is_active')) {
+            $request->merge(['is_active' => $request->boolean('is_active')]);
+        }
+        
         $validator = Validator::make($request->all(), CategoryValidator::onCreate());
         $data = $validator->validate();
         $data = DataNormalizer::normalizeCategory($data);
@@ -47,7 +51,7 @@ class CategoryController extends Controller
             
             $response = [
                 'message' => 'Category created successfully',
-                'data' => new CategoryResource($category),
+                'data' => $category,
             ];
 
             return response()->json($response, 201);
@@ -60,17 +64,21 @@ class CategoryController extends Controller
     public function show(Request $request): JsonResponse
     {
         $category = $request->get('category');
+        $category->load(['creator', 'updater', 'parent']);
         
-        $response = [
-            'data' => new CategoryResource($category),
-        ];
-
-        return response()->json($response);
+        return response()->json([
+            'data' => $category,
+        ]);
     }
 
     public function update(Request $request): JsonResponse
     {
         $category = $request->get('category');
+        
+        if ($request->has('is_active')) {
+            $request->merge(['is_active' => $request->boolean('is_active')]);
+        }
+        
         $validator = Validator::make($request->all(), CategoryValidator::onUpdate($category->id));
         $data = $validator->validate();
         $data = DataNormalizer::normalizeCategory($data, $category->id);
@@ -80,10 +88,11 @@ class CategoryController extends Controller
             
             $response = [
                 'message' => 'Category updated successfully',
-                'data' => new CategoryResource($category),
+                'data' => $category,
             ];
 
             return response()->json($response);
+
         } catch (\Exception $e) {
             report($e);
             throw new \Exception("Unable to update category");
@@ -102,6 +111,7 @@ class CategoryController extends Controller
             ];
 
             return response()->json($response);
+
         } catch (\Exception $e) {
             report($e);
             throw new \Exception("Unable to delete category");
@@ -115,7 +125,7 @@ class CategoryController extends Controller
         
         $response = [
             'message' => 'Category status updated successfully',
-            'data' => new CategoryResource($category),
+            'data' => $category,
         ];
 
         return response()->json($response);
@@ -138,11 +148,13 @@ class CategoryController extends Controller
         return response()->json($response);
     }
 
-    public function search(Request $request, string $query): CategoryCollection
+    public function search(Request $request, string $query): JsonResponse
     {
         $categories = $this->categoryService->search($query);
 
-        return new CategoryCollection($categories);
+        return response()->json([
+            'data' => $categories,
+        ]);
     }
 
     public function tree(Request $request): JsonResponse
@@ -150,7 +162,7 @@ class CategoryController extends Controller
         $categories = $this->categoryService->getTree();
         
         $response = [
-            'data' => CategoryResource::collection($categories),
+            'data' => $categories,
         ];
 
         return response()->json($response);

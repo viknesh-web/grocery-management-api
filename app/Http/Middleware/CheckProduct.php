@@ -10,10 +10,11 @@ class CheckProduct
 {
     public function handle($request, Closure $next)
     {
-        $productId = $request->route('product') ?? $request->input('id');
+        // Get product ID from route parameter (matches hifit-erp-server pattern)
+        $productId = $request->route('product') ?? (isset($request->id) ? $request->id : null);
         
-        if ($productId && intval($productId)) {
-            $id = intval($productId);
+        if ($productId && (is_numeric($productId) || is_int($productId))) {
+            $id = is_int($productId) ? $productId : intval($productId);
             $item = Product::find($id);
             
             if (!$item) {

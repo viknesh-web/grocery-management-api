@@ -10,10 +10,11 @@ class CheckCustomer
 {
     public function handle($request, Closure $next)
     {
-        $customerId = $request->route('customer') ?? $request->input('id');
+        // Get customer ID from route parameter (matches hifit-erp-server pattern)
+        $customerId = $request->route('customer') ?? (isset($request->id) ? $request->id : null);
         
-        if ($customerId && intval($customerId)) {
-            $id = intval($customerId);
+        if ($customerId && (is_numeric($customerId) || is_int($customerId))) {
+            $id = is_int($customerId) ? $customerId : intval($customerId);
             $item = Customer::find($id);
             
             if (!$item) {

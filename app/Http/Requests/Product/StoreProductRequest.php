@@ -79,9 +79,8 @@ class StoreProductRequest extends FormRequest
             $dataToMerge['product_type'] = 'daily';
         }
 
-        // Normalize enabled with default
         if ($this->has('enabled')) {
-            $dataToMerge['enabled'] = filter_var($this->enabled, FILTER_VALIDATE_BOOLEAN) ?: true;
+            $dataToMerge['enabled'] = $this->boolean('enabled');
         } else {
             $dataToMerge['enabled'] = true;
         }
@@ -91,19 +90,11 @@ class StoreProductRequest extends FormRequest
             $dataToMerge['discount_value'] = null;
         }
 
-        // Normalize variations.enabled boolean values (FormData sends as string "true"/"false" or "1"/"0")
         if ($this->has('variations') && is_array($this->variations)) {
             foreach ($this->variations as $index => $variation) {
                 if (isset($variation['enabled'])) {
-                    $enabledValue = $variation['enabled'];
-                    // Convert to boolean: accept true, 1, "1", "true", "on", "yes" as true; everything else as false
-                    $normalized = filter_var($enabledValue, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-                    if ($normalized === null) {
-                        // If filter_var returns null, try manual conversion
-                        $normalized = in_array($enabledValue, [1, '1', 'true', 'on', 'yes', true], true);
-                    }
                     $this->merge([
-                        "variations.{$index}.enabled" => (bool) $normalized
+                        "variations.{$index}.enabled" => (bool) $variation['enabled']
                     ]);
                 }
             }

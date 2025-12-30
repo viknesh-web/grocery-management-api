@@ -39,16 +39,9 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'User registered successfully',
-            'data' => [
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'role' => $user->role,
-                ],
-                'token' => $token,
-                'token_type' => 'Bearer',
-            ],
+            'data' => $user,
+            'token' => $token,
+            'token_type' => 'Bearer',
         ], 201);
     }
 
@@ -74,16 +67,9 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Login successful',
-            'data' => [
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'role' => $user->role,
-                ],
-                'token' => $token,
-                'token_type' => 'Bearer',
-            ],
+            'data' => $user,
+            'token' => $token,
+            'token_type' => 'Bearer',
         ], 200);
     }
 
@@ -93,14 +79,7 @@ class AuthController extends Controller
     public function user(Request $request): JsonResponse
     {
         return response()->json([
-            'data' => [
-                'user' => [
-                    'id' => $request->user()->id,
-                    'name' => $request->user()->name,
-                    'email' => $request->user()->email,
-                    'role' => $request->user()->role,
-                ],
-            ],
+            'data' => $request->user(),
         ], 200);
     }
 
@@ -123,14 +102,7 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Profile updated successfully',
-            'data' => [
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'role' => $user->role,
-                ],
-            ],
+            'data' => $user->fresh(),
         ], 200);
     }
 

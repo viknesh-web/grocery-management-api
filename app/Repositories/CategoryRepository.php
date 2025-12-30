@@ -32,7 +32,7 @@ class CategoryRepository implements CategoryRepositoryInterface
 
         // Apply filters
         if (isset($filters['active'])) {
-            $query->where('is_active', filter_var($filters['active'], FILTER_VALIDATE_BOOLEAN));
+            $query->where('is_active', (bool) $filters['active']);
         }
 
         if (isset($filters['root']) && $filters['root']) {
@@ -78,7 +78,7 @@ class CategoryRepository implements CategoryRepositoryInterface
 
         // Apply filters
         if (isset($filters['active'])) {
-            $query->where('is_active', filter_var($filters['active'], FILTER_VALIDATE_BOOLEAN));
+            $query->where('is_active', (bool) $filters['active']);
         }
 
         if (isset($filters['root']) && $filters['root']) {

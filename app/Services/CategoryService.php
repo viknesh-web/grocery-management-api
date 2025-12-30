@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Models\Category;
-use App\Repositories\Contracts\CategoryRepositoryInterface;
+use App\Repositories\CategoryRepository;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\DB;
 class CategoryService
 {
     public function __construct(
-        private CategoryRepositoryInterface $repository,
+        private CategoryRepository $repository,
         private ImageService $imageService
     ) {}
 
@@ -209,7 +209,7 @@ class CategoryService
      */
     public function getProducts(Category $category, array $filters = [], int $perPage = 15): \Illuminate\Contracts\Pagination\LengthAwarePaginator
     {
-        $query = $category->products()->with(['creator:id,name,email', 'updater:id,name,email', 'category:id,name,slug']);
+        $query = $category->products()->with(['creator', 'updater', 'category']);
 
         // Search
         if (isset($filters['search'])) {
@@ -218,7 +218,7 @@ class CategoryService
 
         // Filter by enabled status
         if (isset($filters['enabled'])) {
-            $query->where('enabled', filter_var($filters['enabled'], FILTER_VALIDATE_BOOLEAN));
+            $query->where('enabled', (bool) $filters['enabled']);
         }
 
         // Sort
