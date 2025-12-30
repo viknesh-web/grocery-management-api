@@ -3,7 +3,6 @@
 namespace App\Repositories;
 
 use App\Models\Customer;
-use App\Repositories\Contracts\CustomerRepositoryInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -12,7 +11,7 @@ use Illuminate\Database\Eloquent\Collection;
  * 
  * Handles all database operations for customers.
  */
-class CustomerRepository implements CustomerRepositoryInterface
+class CustomerRepository
 {
     /**
      * Get all customers with optional filters and relations.
@@ -23,32 +22,7 @@ class CustomerRepository implements CustomerRepositoryInterface
      */
     public function all(array $filters = [], array $relations = []): Collection
     {
-        $query = Customer::query();
-
-        if (!empty($relations)) {
-            $query->with($relations);
-        }
-
-        // Apply filters
-        if (isset($filters['status']) && in_array($filters['status'], ['active', 'inactive'])) {
-            $query->where('status', $filters['status']);
-        }
-
-        if (isset($filters['search'])) {
-            $query->where(function ($q) use ($filters) {
-                $q->where('name', 'like', '%' . $filters['search'] . '%')
-                  ->orWhere('whatsapp_number', 'like', '%' . $filters['search'] . '%')
-                  ->orWhere('address', 'like', '%' . $filters['search'] . '%')
-                  ->orWhere('landmark', 'like', '%' . $filters['search'] . '%');
-            });
-        }
-
-        // Apply sorting
-        $sortBy = $filters['sort_by'] ?? 'created_at';
-        $sortOrder = $filters['sort_order'] ?? 'desc';
-        $query->orderBy($sortBy, $sortOrder);
-
-        return $query->get();
+        return $this->buildQuery($filters, $relations)->get();
     }
 
     /**
@@ -61,6 +35,18 @@ class CustomerRepository implements CustomerRepositoryInterface
      */
     public function paginate(array $filters = [], int $perPage = 15, array $relations = []): LengthAwarePaginator
     {
+        return $this->buildQuery($filters, $relations)->paginate($perPage);
+    }
+
+    /**
+     * Build query with common logic for filtering, sorting, and relations.
+     *
+     * @param array $filters
+     * @param array $relations
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    private function buildQuery(array $filters = [], array $relations = [])
+    {
         $query = Customer::query();
 
         if (!empty($relations)) {
@@ -86,60 +72,9 @@ class CustomerRepository implements CustomerRepositoryInterface
         $sortOrder = $filters['sort_order'] ?? 'desc';
         $query->orderBy($sortBy, $sortOrder);
 
-        return $query->paginate($perPage);
+        return $query;
     }
 
-    /**
-     * Find a customer by ID with optional relations.
-     *
-     * @param int $id
-     * @param array $relations
-     * @return Customer|null
-     */
-    public function find(int $id, array $relations = []): ?Customer
-    {
-        $query = Customer::query();
-
-        if (!empty($relations)) {
-            $query->with($relations);
-        }
-
-        return $query->find($id);
-    }
-
-    /**
-     * Create a new customer.
-     *
-     * @param array $data
-     * @return Customer
-     */
-    public function create(array $data): Customer
-    {
-        return Customer::create($data);
-    }
-
-    /**
-     * Update a customer.
-     *
-     * @param Customer $customer
-     * @param array $data
-     * @return bool
-     */
-    public function update(Customer $customer, array $data): bool
-    {
-        return $customer->update($data);
-    }
-
-    /**
-     * Delete a customer.
-     *
-     * @param Customer $customer
-     * @return bool
-     */
-    public function delete(Customer $customer): bool
-    {
-        return $customer->delete();
-    }
 
     /**
      * Search customers by query string.

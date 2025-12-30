@@ -2,20 +2,12 @@
 
 namespace App\Providers;
 
-use App\Repositories\CategoryRepository;
-use App\Repositories\Contracts\CategoryRepositoryInterface;
-use App\Repositories\Contracts\CustomerRepositoryInterface;
-use App\Repositories\Contracts\PriceUpdateRepositoryInterface;
-use App\Repositories\Contracts\ProductRepositoryInterface;
-use App\Repositories\CustomerRepository;
-use App\Repositories\PriceUpdateRepository;
-use App\Repositories\ProductRepository;
 use Illuminate\Support\ServiceProvider;
 
 /**
  * Repository Service Provider
  * 
- * Binds repository interfaces to their implementations.
+ * No longer needed - repositories are injected directly.
  */
 class RepositoryServiceProvider extends ServiceProvider
 {
@@ -26,10 +18,7 @@ class RepositoryServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->bind(CategoryRepositoryInterface::class, CategoryRepository::class);
-        $this->app->bind(ProductRepositoryInterface::class, ProductRepository::class);
-        $this->app->bind(CustomerRepositoryInterface::class, CustomerRepository::class);
-        $this->app->bind(PriceUpdateRepositoryInterface::class, PriceUpdateRepository::class);
+        //
     }
 
     /**

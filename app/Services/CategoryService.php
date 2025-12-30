@@ -41,8 +41,7 @@ class CategoryService
      */
     public function find(int $id): ?Category
     {
-        $relations = [];
-        return $this->repository->find($id, $relations);
+        return Category::find($id);
     }
 
     /**
@@ -62,7 +61,7 @@ class CategoryService
                 $data['image'] = $this->imageService->uploadCategoryImage($image);
             }
 
-            $category = $this->repository->create($data);
+            $category = Category::create($data);
 
             DB::commit();
             return $category;
@@ -100,7 +99,7 @@ class CategoryService
                 $data['image'] = null;
             }
 
-            $this->repository->update($category, $data);
+            $category->update($data);
             $category->refresh();
 
             DB::commit();
@@ -132,7 +131,7 @@ class CategoryService
                 $this->imageService->deleteCategoryImage($category->image);
             }
 
-            $result = $this->repository->delete($category);
+            $result = $category->delete();
 
             DB::commit();
             return $result;
@@ -152,7 +151,7 @@ class CategoryService
     public function toggleStatus(Category $category, int $userId): Category
     {
         $newStatus = $category->status === 'active' ? 'inactive' : 'active';
-        $this->repository->update($category, [
+        $category->update([
             'status' => $newStatus,
         ]);
 

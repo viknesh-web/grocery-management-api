@@ -4,7 +4,7 @@ namespace App\Services;
 
 use App\Models\PriceUpdate;
 use App\Models\Product;
-use App\Repositories\Contracts\ProductRepositoryInterface;
+use App\Repositories\ProductRepository;
 use App\Services\ProductFilterService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\UploadedFile;
@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\DB;
 class ProductService
 {
     public function __construct(
-        private ProductRepositoryInterface $repository,
+        private ProductRepository $repository,
         private ImageService $imageService,
         private ProductFilterService $filterService
     ) {}
@@ -55,8 +55,11 @@ class ProductService
      */
     public function find(int $id): ?Product
     {
-        $relations = ['creator:id,name,email', 'updater:id,name,email', 'category:id,name'];
-        return $this->repository->find($id, $relations);
+        return Product::with([
+            'creator:id,name,email',
+            'updater:id,name,email',
+            'category:id,name'
+        ])->find($id);
     }
 
     /**
@@ -84,7 +87,7 @@ class ProductService
             $data['created_by'] = $userId;
             $data['updated_by'] = $userId;
 
-            $product = $this->repository->create($data);
+            $product = Product::create($data);
 
             // Create price update record for new product
             $this->createPriceUpdateRecord($product, null, $data, $userId);
@@ -159,7 +162,7 @@ class ProductService
 
             $data['updated_by'] = $userId;
 
-            $this->repository->update($product, $data);
+            $product->update($data);
 
             // Refresh product to get updated values
             $product->refresh();
@@ -200,7 +203,7 @@ class ProductService
                 $this->imageService->deleteProductImage($product->image);
             }
 
-            $result = $this->repository->delete($product);
+            $result = $product->delete();
 
             DB::commit();
             return $result;
@@ -220,7 +223,7 @@ class ProductService
     public function toggleStatus(Product $product, int $userId): Product
     {
         $newStatus = $product->status === 'active' ? 'inactive' : 'active';
-        $this->repository->update($product, [
+        $product->update([
             'status' => $newStatus,
             'updated_by' => $userId,
         ]);

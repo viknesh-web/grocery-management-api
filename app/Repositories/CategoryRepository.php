@@ -3,7 +3,6 @@
 namespace App\Repositories;
 
 use App\Models\Category;
-use App\Repositories\Contracts\CategoryRepositoryInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -12,7 +11,7 @@ use Illuminate\Database\Eloquent\Collection;
  * 
  * Handles all database operations for categories.
  */
-class CategoryRepository implements CategoryRepositoryInterface
+class CategoryRepository
 {
     /**
      * Get all categories with optional filters and relations.
@@ -23,33 +22,7 @@ class CategoryRepository implements CategoryRepositoryInterface
      */
     public function all(array $filters = [], array $relations = []): Collection
     {
-        $query = Category::query();
-
-        // Apply relations
-        if (!empty($relations)) {
-            $query->with($relations);
-        }
-
-        // Apply filters
-        if (isset($filters['active'])) {
-            $status = filter_var($filters['active'], FILTER_VALIDATE_BOOLEAN) ? 'active' : 'inactive';
-            $query->where('status', $status);
-        }
-
-        if (isset($filters['status']) && in_array($filters['status'], ['active', 'inactive'])) {
-            $query->where('status', $filters['status']);
-        }
-
-        if (isset($filters['search'])) {
-            $query->search($filters['search']);
-        }
-
-        // Apply sorting
-        $sortBy = $filters['sort_by'] ?? 'name';
-        $sortOrder = $filters['sort_order'] ?? 'asc';
-        $query->orderBy($sortBy, $sortOrder);
-
-        return $query->get();
+        return $this->query($filters, $relations)->get();
     }
 
     /**
@@ -62,6 +35,26 @@ class CategoryRepository implements CategoryRepositoryInterface
      */
     public function paginate(array $filters = [], int $perPage = 15, array $relations = []): LengthAwarePaginator
     {
+        $categories = $this->query($filters, $relations)->paginate($perPage);
+
+        // Add products count
+        $categories->getCollection()->transform(function ($category) {
+            $category->products_count = $category->products()->count();
+            return $category;
+        });
+
+        return $categories;
+    }
+
+    /**
+     * Build query with common logic for filtering, sorting, and relations.
+     *
+     * @param array $filters
+     * @param array $relations
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    private function query(array $filters = [], array $relations = [])
+    {
         $query = Category::query();
 
         // Apply relations
@@ -88,68 +81,9 @@ class CategoryRepository implements CategoryRepositoryInterface
         $sortOrder = $filters['sort_order'] ?? 'asc';
         $query->orderBy($sortBy, $sortOrder);
 
-        $categories = $query->paginate($perPage);
-
-        // Add products count
-        $categories->getCollection()->transform(function ($category) {
-            $category->products_count = $category->products()->count();
-            return $category;
-        });
-
-        return $categories;
+        return $query;
     }
 
-    /**
-     * Find a category by ID with optional relations.
-     *
-     * @param int $id
-     * @param array $relations
-     * @return Category|null
-     */
-    public function find(int $id, array $relations = []): ?Category
-    {
-        $query = Category::query();
-
-        if (!empty($relations)) {
-            $query->with($relations);
-        }
-
-        return $query->find($id);
-    }
-
-    /**
-     * Create a new category.
-     *
-     * @param array $data
-     * @return Category
-     */
-    public function create(array $data): Category
-    {
-        return Category::create($data);
-    }
-
-    /**
-     * Update a category.
-     *
-     * @param Category $category
-     * @param array $data
-     * @return bool
-     */
-    public function update(Category $category, array $data): bool
-    {
-        return $category->update($data);
-    }
-
-    /**
-     * Delete a category.
-     *
-     * @param Category $category
-     * @return bool
-     */
-    public function delete(Category $category): bool
-    {
-        return $category->delete();
-    }
 
     /**
      * Search categories by query string.
