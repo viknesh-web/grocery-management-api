@@ -13,16 +13,16 @@ return new class extends Migration
     {
         Schema::create('customers', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
-            $table->string('whatsapp_number');
+            $table->string('name', 255);
+            $table->string('whatsapp_number', 20)->unique();
             $table->text('address')->nullable();
-            $table->string('area')->nullable();
+            $table->string('landmark', 255)->nullable();
             $table->text('remarks')->nullable();
-            $table->boolean('active')->default(true);
-            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
-            $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->enum('status', ['active', 'inactive'])->default('active');
             $table->timestamps();
-            $table->softDeletes();
+            
+            $table->index('whatsapp_number');
+            $table->index('status');
         });
     }
 

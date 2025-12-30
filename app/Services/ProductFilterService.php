@@ -31,12 +31,8 @@ class ProductFilterService
         }
 
         // Status filter
-        if (isset($filters['status'])) {
-            $enabled = filter_var($filters['status'], FILTER_VALIDATE_BOOLEAN);
-            $query->where('enabled', $enabled);
-        } elseif (isset($filters['enabled'])) {
-            $enabled = filter_var($filters['enabled'], FILTER_VALIDATE_BOOLEAN);
-            $query->where('enabled', $enabled);
+        if (isset($filters['status']) && in_array($filters['status'], ['active', 'inactive'])) {
+            $query->where('status', $filters['status']);
         }
 
         // Has discount filter (date-range aware)
@@ -152,14 +148,14 @@ class ProductFilterService
      */
     public function applySorting(Builder $query, ?string $sortBy, string $sortOrder = 'asc'): Builder
     {
-        $allowedSortFields = ['name', 'original_price', 'selling_price', 'stock_quantity', 'created_at', 'product_type'];
+        $allowedSortFields = ['name', 'regular_price', 'selling_price', 'stock_quantity', 'created_at', 'product_type'];
         $sortOrder = strtolower($sortOrder) === 'desc' ? 'desc' : 'asc';
 
         if ($sortBy && in_array($sortBy, $allowedSortFields)) {
             // For calculated fields, we need special handling
             if ($sortBy === 'selling_price') {
-                // Sort by original_price and discount for selling_price approximation
-                $query->orderBy('original_price', $sortOrder);
+                // Sort by regular_price and discount for selling_price approximation
+                $query->orderBy('regular_price', $sortOrder);
             } else {
                 $query->orderBy($sortBy, $sortOrder);
             }

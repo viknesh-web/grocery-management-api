@@ -25,14 +25,12 @@ class AuthController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
-            'role' => ['sometimes', 'string', 'in:admin,staff'],
         ]);
 
         $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
-            'role' => $validated['role'] ?? 'staff',
         ]);
 
         $token = $user->createToken('auth_token')->plainTextToken;
@@ -44,7 +42,6 @@ class AuthController extends Controller
                     'id' => $user->id,
                     'name' => $user->name,
                     'email' => $user->email,
-                    'role' => $user->role,
                 ],
                 'token' => $token,
                 'token_type' => 'Bearer',
@@ -79,7 +76,6 @@ class AuthController extends Controller
                     'id' => $user->id,
                     'name' => $user->name,
                     'email' => $user->email,
-                    'role' => $user->role,
                 ],
                 'token' => $token,
                 'token_type' => 'Bearer',
@@ -98,7 +94,6 @@ class AuthController extends Controller
                     'id' => $request->user()->id,
                     'name' => $request->user()->name,
                     'email' => $request->user()->email,
-                    'role' => $request->user()->role,
                 ],
             ],
         ], 200);
@@ -128,7 +123,6 @@ class AuthController extends Controller
                     'id' => $user->id,
                     'name' => $user->name,
                     'email' => $user->email,
-                    'role' => $user->role,
                 ],
             ],
         ], 200);

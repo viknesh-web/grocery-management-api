@@ -30,7 +30,7 @@ class PriceUpdateController extends Controller
      */
     public function getProducts(Request $request): JsonResponse
     {
-        $query = Product::enabled();
+        $query = Product::where('status', 'active');
 
         // Search
         if ($request->has('search')) {
@@ -69,7 +69,7 @@ class PriceUpdateController extends Controller
             }
         }
 
-        $products = $query->with(['category:id,name,slug'])->orderBy('name')->get();
+        $products = $query->with(['category:id,name'])->orderBy('name')->get();
         $data = $products->map(function ($product) {
                 $discountActive = $product->isDiscountActive();
                 return [
@@ -77,7 +77,7 @@ class PriceUpdateController extends Controller
                     'name' => $product->name,
                     'item_code' => $product->item_code,
                     'image_url' => $product->image_url,
-                    'original_price' => (float) $product->original_price,
+                    'regular_price' => (float) $product->regular_price,
                     'discount_type' => $discountActive ? $product->discount_type : 'none',
                     'discount_value' => $discountActive && $product->discount_value
                         ? (float) $product->discount_value
@@ -91,7 +91,7 @@ class PriceUpdateController extends Controller
                         'name' => $product->category->name,
                     ] : null,
                     // Keep current_* fields for backward compatibility if needed
-                    'current_original_price' => (float) $product->original_price,
+                    'current_regular_price' => (float) $product->regular_price,
                     'current_discount_type' => $product->discount_type,
                     'current_discount_value' => $product->discount_value ? (float) $product->discount_value : null,
                     'current_selling_price' => (float) $product->selling_price,

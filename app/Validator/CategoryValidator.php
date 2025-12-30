@@ -11,12 +11,9 @@ class CategoryValidator
     {
         return [
             'name' => ['required', 'string', 'max:255', 'min:2', 'unique:categories,name'],
-            'slug' => ['nullable', 'string', 'max:255', 'unique:categories,slug'],
             'description' => ['nullable', 'string', 'max:1000'],
             'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048'],
-            'is_active' => ['sometimes', 'boolean'],
-            'display_order' => ['nullable', 'integer', 'min:0', 'max:9999'],
-            'parent_id' => ['nullable', 'integer', 'exists:categories,id'],
+            'status' => ['sometimes', 'string', Rule::in(['active', 'inactive'])],
         ];
     }
 
@@ -24,41 +21,13 @@ class CategoryValidator
     {
         return [
             'name' => ['sometimes', 'required', 'string', 'max:255', 'min:2', Rule::unique('categories', 'name')->ignore($id)],
-            'slug' => ['nullable', 'string', 'max:255', Rule::unique('categories', 'slug')->ignore($id)],
             'description' => ['nullable', 'string', 'max:1000'],
             'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048'],
             'image_removed' => ['sometimes', 'boolean'],
-            'is_active' => ['sometimes', 'boolean'],
-            'display_order' => ['nullable', 'integer', 'min:0', 'max:9999'],
-            'parent_id' => ['nullable', 'integer', 'exists:categories,id'],
+            'status' => ['sometimes', 'string', Rule::in(['active', 'inactive'])],
         ];
     }
 
-    /**
-     * Check if setting parent_id would create a circular reference.
-     *
-     * @param \App\Models\Category $category
-     * @param int $newParentId
-     * @return bool
-     */
-    protected static function wouldCreateCircularReference($category, int $newParentId): bool
-    {
-        $parent = Category::find($newParentId);
-        if (!$parent) {
-            return false;
-        }
-
-        // Check if the new parent is a descendant of the current category
-        $currentParent = $parent;
-        while ($currentParent && $currentParent->parent_id) {
-            if ($currentParent->parent_id == $category->id) {
-                return true;
-            }
-            $currentParent = Category::find($currentParent->parent_id);
-        }
-
-        return false;
-    }
 }
 
 

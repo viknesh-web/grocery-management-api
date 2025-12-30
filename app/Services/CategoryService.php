@@ -29,7 +29,7 @@ class CategoryService
      */
     public function getPaginated(array $filters = [], int $perPage = 15): \Illuminate\Contracts\Pagination\LengthAwarePaginator
     {
-        $relations = ['creator:id,name,email', 'updater:id,name,email', 'parent:id,name,slug'];
+        $relations = [];
         return $this->repository->paginate($filters, $perPage, $relations);
     }
 
@@ -41,7 +41,7 @@ class CategoryService
      */
     public function find(int $id): ?Category
     {
-        $relations = ['creator:id,name,email', 'updater:id,name,email', 'parent:id,name,slug'];
+        $relations = [];
         return $this->repository->find($id, $relations);
     }
 
@@ -61,9 +61,6 @@ class CategoryService
             if ($image) {
                 $data['image'] = $this->imageService->uploadCategoryImage($image);
             }
-
-            $data['created_by'] = $userId;
-            $data['updated_by'] = $userId;
 
             $category = $this->repository->create($data);
 
@@ -102,8 +99,6 @@ class CategoryService
                 }
                 $data['image'] = null;
             }
-
-            $data['updated_by'] = $userId;
 
             $this->repository->update($category, $data);
             $category->refresh();
@@ -156,9 +151,9 @@ class CategoryService
      */
     public function toggleStatus(Category $category, int $userId): Category
     {
+        $newStatus = $category->status === 'active' ? 'inactive' : 'active';
         $this->repository->update($category, [
-            'is_active' => !$category->is_active,
-            'updated_by' => $userId,
+            'status' => $newStatus,
         ]);
 
         return $category->fresh();
@@ -167,7 +162,7 @@ class CategoryService
     /**
      * Reorder categories.
      *
-     * @param array $categories Array of ['id' => int, 'display_order' => int]
+     * @param array $categories Array of ['id' => int] (display_order no longer supported)
      * @return void
      */
     public function reorder(array $categories): void
@@ -183,20 +178,19 @@ class CategoryService
      */
     public function search(string $query): Collection
     {
-        $relations = ['creator:id,name,email', 'updater:id,name,email', 'parent:id,name,slug'];
+        $relations = [];
         return $this->repository->search($query, $relations);
     }
 
     /**
      * Get category tree (hierarchical structure).
+     * Note: Hierarchical structure is no longer supported, returns flat list of active categories.
      *
      * @return Collection
      */
     public function getTree(): Collection
     {
-        return $this->repository->getRootCategories(['children' => function ($query) {
-            $query->active()->ordered();
-        }]);
+        return $this->repository->getRootCategories();
     }
 
     /**
@@ -209,16 +203,16 @@ class CategoryService
      */
     public function getProducts(Category $category, array $filters = [], int $perPage = 15): \Illuminate\Contracts\Pagination\LengthAwarePaginator
     {
-        $query = $category->products()->with(['creator:id,name,email', 'updater:id,name,email', 'category:id,name,slug']);
+        $query = $category->products()->with(['category:id,name']);
 
         // Search
         if (isset($filters['search'])) {
             $query->search($filters['search']);
         }
 
-        // Filter by enabled status
-        if (isset($filters['enabled'])) {
-            $query->where('enabled', filter_var($filters['enabled'], FILTER_VALIDATE_BOOLEAN));
+        // Filter by status
+        if (isset($filters['status'])) {
+            $query->where('status', $filters['status']);
         }
 
         // Sort

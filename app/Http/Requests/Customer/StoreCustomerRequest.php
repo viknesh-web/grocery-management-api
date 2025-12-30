@@ -67,19 +67,11 @@ class StoreCustomerRequest extends FormRequest
             $dataToMerge['whatsapp_number'] = $whatsappNumber;
         }
 
-        // Normalize address/area
-        // Always accept both address and area fields regardless of feature flag
+        // Normalize address
         if ($this->has('address')) {
             $addressValue = $this->input('address');
             $dataToMerge['address'] = ($addressValue !== null && $addressValue !== '') 
                 ? trim((string) $addressValue) 
-                : null;
-        }
-
-        if ($this->has('area')) {
-            $areaValue = $this->input('area');
-            $dataToMerge['area'] = ($areaValue !== null && $areaValue !== '') 
-                ? trim((string) $areaValue) 
                 : null;
         }
 
@@ -93,11 +85,11 @@ class StoreCustomerRequest extends FormRequest
             $dataToMerge['remarks'] = trim((string) $this->remarks);
         }
 
-        // Normalize active with default
-        if ($this->has('active')) {
-            $dataToMerge['active'] = filter_var($this->active, FILTER_VALIDATE_BOOLEAN) ?: true;
+        // Normalize status with default
+        if ($this->has('status') && in_array($this->status, ['active', 'inactive'])) {
+            $dataToMerge['status'] = $this->status;
         } else {
-            $dataToMerge['active'] = true;
+            $dataToMerge['status'] = 'active';
         }
 
         if (!empty($dataToMerge)) {
@@ -132,10 +124,8 @@ class StoreCustomerRequest extends FormRequest
             ],
             'landmark' => ['nullable', 'string', 'max:255'],
             'remarks' => ['nullable', 'string', 'max:1000'],
-            'active' => ['sometimes', 'boolean'],
-            // Always accept both address and area fields
+            'status' => ['sometimes', 'string', Rule::in(['active', 'inactive'])],
             'address' => ['nullable', 'string', 'max:1000'],
-            'area' => ['nullable', 'string', 'max:255'],
         ];
 
         return $rules;

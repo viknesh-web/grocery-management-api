@@ -15,38 +15,28 @@ class CategorySeeder extends Seeder
         $categories = [
             [
                 'name' => 'Vegetables',
-                'slug' => 'vegetables',
                 'description' => 'Fresh vegetables',
-                'is_active' => true,
-                'display_order' => 1,
+                'status' => 'active',
             ],
             [
                 'name' => 'Fruits',
-                'slug' => 'fruits',
                 'description' => 'Fresh fruits',
-                'is_active' => true,
-                'display_order' => 2,
+                'status' => 'active',
             ],
             [
                 'name' => 'Dairy',
-                'slug' => 'dairy',
                 'description' => 'Dairy products',
-                'is_active' => true,
-                'display_order' => 3,
+                'status' => 'active',
             ],
             [
                 'name' => 'Grains',
-                'slug' => 'grains',
                 'description' => 'Rice, wheat, and other grains',
-                'is_active' => true,
-                'display_order' => 4,
+                'status' => 'active',
             ],
             [
                 'name' => 'Spices',
-                'slug' => 'spices',
                 'description' => 'Spices and condiments',
-                'is_active' => true,
-                'display_order' => 5,
+                'status' => 'active',
             ],
         ];
 

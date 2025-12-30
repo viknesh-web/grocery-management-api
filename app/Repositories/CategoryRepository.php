@@ -32,19 +32,12 @@ class CategoryRepository implements CategoryRepositoryInterface
 
         // Apply filters
         if (isset($filters['active'])) {
-            $query->where('is_active', filter_var($filters['active'], FILTER_VALIDATE_BOOLEAN));
+            $status = filter_var($filters['active'], FILTER_VALIDATE_BOOLEAN) ? 'active' : 'inactive';
+            $query->where('status', $status);
         }
 
-        if (isset($filters['root']) && $filters['root']) {
-            $query->root();
-        }
-
-        if (isset($filters['parent_id'])) {
-            if ($filters['parent_id'] === 'null') {
-                $query->whereNull('parent_id');
-            } else {
-                $query->where('parent_id', $filters['parent_id']);
-            }
+        if (isset($filters['status']) && in_array($filters['status'], ['active', 'inactive'])) {
+            $query->where('status', $filters['status']);
         }
 
         if (isset($filters['search'])) {
@@ -52,9 +45,9 @@ class CategoryRepository implements CategoryRepositoryInterface
         }
 
         // Apply sorting
-        $sortBy = $filters['sort_by'] ?? 'display_order';
+        $sortBy = $filters['sort_by'] ?? 'name';
         $sortOrder = $filters['sort_order'] ?? 'asc';
-        $query->orderBy($sortBy, $sortOrder)->orderBy('name');
+        $query->orderBy($sortBy, $sortOrder);
 
         return $query->get();
     }
@@ -78,19 +71,12 @@ class CategoryRepository implements CategoryRepositoryInterface
 
         // Apply filters
         if (isset($filters['active'])) {
-            $query->where('is_active', filter_var($filters['active'], FILTER_VALIDATE_BOOLEAN));
+            $status = filter_var($filters['active'], FILTER_VALIDATE_BOOLEAN) ? 'active' : 'inactive';
+            $query->where('status', $status);
         }
 
-        if (isset($filters['root']) && $filters['root']) {
-            $query->root();
-        }
-
-        if (isset($filters['parent_id'])) {
-            if ($filters['parent_id'] === 'null') {
-                $query->whereNull('parent_id');
-            } else {
-                $query->where('parent_id', $filters['parent_id']);
-            }
+        if (isset($filters['status']) && in_array($filters['status'], ['active', 'inactive'])) {
+            $query->where('status', $filters['status']);
         }
 
         if (isset($filters['search'])) {
@@ -98,9 +84,9 @@ class CategoryRepository implements CategoryRepositoryInterface
         }
 
         // Apply sorting
-        $sortBy = $filters['sort_by'] ?? 'display_order';
+        $sortBy = $filters['sort_by'] ?? 'name';
         $sortOrder = $filters['sort_order'] ?? 'asc';
-        $query->orderBy($sortBy, $sortOrder)->orderBy('name');
+        $query->orderBy($sortBy, $sortOrder);
 
         $categories = $query->paginate($perPage);
 
@@ -175,14 +161,13 @@ class CategoryRepository implements CategoryRepositoryInterface
     public function search(string $query, array $relations = []): Collection
     {
         $builder = Category::query();
-        $builder->where('name', 'like', "%{$query}%")
-            ->orWhere('slug', 'like', "%{$query}%");
+        $builder->where('name', 'like', "%{$query}%");
 
         if (!empty($relations)) {
             $builder->with($relations);
         }
 
-        $categories = $builder->ordered()->get();
+        $categories = $builder->orderBy('name', 'asc')->get();
 
         $categories->transform(function ($category) {
             $category->products_count = $category->products()->count();
@@ -200,7 +185,7 @@ class CategoryRepository implements CategoryRepositoryInterface
      */
     public function getRootCategories(array $relations = []): Collection
     {
-        $query = Category::root()->active()->ordered();
+        $query = Category::active()->orderBy('name', 'asc');
 
         if (!empty($relations)) {
             $query->with($relations);
@@ -227,18 +212,15 @@ class CategoryRepository implements CategoryRepositoryInterface
     }
 
     /**
-     * Reorder categories by display_order.
+     * Reorder categories (no-op since display_order is removed).
      *
      * @param array $items Array of ['id' => int, 'display_order' => int]
      * @return void
      */
     public function reorder(array $items): void
     {
-        foreach ($items as $item) {
-            Category::where('id', $item['id'])->update([
-                'display_order' => $item['display_order'],
-            ]);
-        }
+        // Display order is no longer supported in the schema
+        // This method is kept for API compatibility but does nothing
     }
 
     /**

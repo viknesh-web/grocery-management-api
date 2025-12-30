@@ -24,8 +24,8 @@ class PriceUpdateResource extends JsonResource
                     'item_code' => $this->product->item_code,
                 ];
             }),
-            'old_original_price' => $this->old_original_price ? (float) $this->old_original_price : null,
-            'new_original_price' => (float) $this->new_original_price,
+            'old_regular_price' => $this->old_regular_price ? (float) $this->old_regular_price : null,
+            'new_regular_price' => (float) $this->new_regular_price,
             'old_discount_type' => $this->old_discount_type,
             'new_discount_type' => $this->new_discount_type,
             'old_discount_value' => $this->old_discount_value ? (float) $this->old_discount_value : null,

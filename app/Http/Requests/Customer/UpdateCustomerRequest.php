@@ -69,19 +69,11 @@ class UpdateCustomerRequest extends FormRequest
             $dataToMerge['whatsapp_number'] = $whatsappNumber;
         }
 
-        // Normalize address/area
-        // Always accept both address and area fields regardless of feature flag
+        // Normalize address
         if ($this->has('address')) {
             $addressValue = $this->input('address');
             $dataToMerge['address'] = ($addressValue !== null && $addressValue !== '') 
                 ? trim((string) $addressValue) 
-                : null;
-        }
-
-        if ($this->has('area')) {
-            $areaValue = $this->input('area');
-            $dataToMerge['area'] = ($areaValue !== null && $areaValue !== '') 
-                ? trim((string) $areaValue) 
                 : null;
         }
 
@@ -95,14 +87,9 @@ class UpdateCustomerRequest extends FormRequest
             $dataToMerge['remarks'] = trim((string) $this->remarks);
         }
 
-        // Normalize active (no default for updates)
-        if ($this->has('active')) {
-            $activeValue = $this->active;
-            if (is_string($activeValue)) {
-                $dataToMerge['active'] = filter_var($activeValue, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false;
-            } else {
-                $dataToMerge['active'] = (bool) $activeValue;
-            }
+        // Normalize status (no default for updates)
+        if ($this->has('status') && in_array($this->status, ['active', 'inactive'])) {
+            $dataToMerge['status'] = $this->status;
         }
 
         if (!empty($dataToMerge)) {
@@ -141,10 +128,8 @@ class UpdateCustomerRequest extends FormRequest
             ],
             'landmark' => ['nullable', 'string', 'max:255'],
             'remarks' => ['nullable', 'string', 'max:1000'],
-            'active' => ['sometimes', 'boolean'],
-            // Always accept both address and area fields
+            'status' => ['sometimes', 'string', Rule::in(['active', 'inactive'])],
             'address' => ['sometimes', 'nullable', 'string', 'max:1000'],
-            'area' => ['sometimes', 'nullable', 'string', 'max:255'],
         ];
 
         return $rules;
