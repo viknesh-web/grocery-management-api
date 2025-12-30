@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\API;
 
 use App\Exceptions\MessageException;
+use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Services\PdfService;
@@ -63,13 +64,10 @@ class WhatsAppController extends Controller
         $pdfPath = $this->pdfService->generatePriceList($productIds, $pdfLayout);
         $pdfUrl = $this->pdfService->getPdfUrl($pdfPath);
 
-        return response()->json([
-            'message' => 'Price list PDF generated successfully',
-            'data' => [
-                'pdf_path' => $pdfPath,
-                'pdf_url' => $pdfUrl,
-            ],
-        ], 200);
+        return ApiResponse::success([
+            'pdf_path' => $pdfPath,
+            'pdf_url' => $pdfUrl,
+        ], 'Price list PDF generated successfully');
     }
 
     /**
@@ -151,17 +149,17 @@ class WhatsAppController extends Controller
         // Validate customer_ids if provided and not sending to all
         if (!$sendToAll && $customerIds !== null && !empty($customerIds)) {
             if (!is_array($customerIds)) {
-                return response()->json([
-                    'message' => 'Invalid customer_ids format',
-                    'errors' => ['customer_ids' => ['customer_ids must be an array']],
-                ], 422);
+                return ApiResponse::validationError(
+                    ['customer_ids' => ['customer_ids must be an array']],
+                    'Invalid customer_ids format'
+                );
             }
             foreach ($customerIds as $id) {
                 if (!is_numeric($id) || !Customer::where('id', $id)->exists()) {
-                    return response()->json([
-                        'message' => 'Invalid customer ID',
-                        'errors' => ['customer_ids' => ['One or more customer IDs are invalid']],
-                    ], 422);
+                    return ApiResponse::validationError(
+                        ['customer_ids' => ['One or more customer IDs are invalid']],
+                        'Invalid customer ID'
+                    );
                 }
             }
         }
@@ -175,76 +173,18 @@ class WhatsAppController extends Controller
         // Handle custom PDF upload
         $customPdfUrl = null;
         if ($pdfType === 'custom' && $request->hasFile('custom_pdf')) {
-            $file = $request->file('custom_pdf');
-            
-            // Get original filename and extension
-            $originalName = $file->getClientOriginalName();
-            $extension = $file->getClientOriginalExtension() ?: 'pdf';
-            
-            // Sanitize filename for filesystem safety (remove path traversal attempts, etc.)
-            // Remove directory separators and null bytes
-            $safeName = str_replace(['/', '\\', "\0"], '', $originalName);
-            // Trim and normalize whitespace, replace spaces with hyphens, and remove unsafe characters
-            $safeName = trim($safeName);
-            $safeName = preg_replace('/\s+/', '-', $safeName);
-            $safeName = preg_replace('/[^A-Za-z0-9_\-\.]/', '', $safeName);
-            
-            // If no extension, ensure .pdf
-            if (!pathinfo($safeName, PATHINFO_EXTENSION)) {
-                $safeName .= '.' . $extension;
-            }
-            
-            // Use original filename with timestamp prefix to ensure uniqueness
-            $filename = date('Y-m-d_H-i-s') . '_' . $safeName;
-            $path = 'pdfs/' . $filename;
-            
-            // Store to media disk (consistent with regular PDFs)
-            $disk = \Illuminate\Support\Facades\Storage::disk('media');
-            
-            // Ensure pdfs directory exists
-            $directory = $disk->path('pdfs');
-            if (!is_dir($directory)) {
-                mkdir($directory, 0755, true);
-            }
-            
-            // Check if file already exists and append number if needed
-            $counter = 1;
-            $baseFilename = $filename;
-            while ($disk->exists($path)) {
-                $pathInfo = pathinfo($baseFilename);
-                $nameWithoutExt = $pathInfo['filename'];
-                $ext = $pathInfo['extension'] ?? 'pdf';
-                $filename = $nameWithoutExt . '_' . $counter . '.' . $ext;
-                $path = 'pdfs/' . $filename;
-                $counter++;
-            }
-            
-            // Store the file
-            $disk->put($path, file_get_contents($file->getRealPath()));
-            
-            // Verify file was stored
-            if (!$disk->exists($path)) {
-                throw new MessageException('Failed to store custom PDF file');
-            }
-            
-            // Get the URL using PdfService (uses media disk)
-            $customPdfUrl = $this->pdfService->getPdfUrl($path);
-            // Ensure URL has no surrounding whitespace and encode spaces
-            if (!empty($customPdfUrl)) {
-                $customPdfUrl = trim($customPdfUrl);
-                $customPdfUrl = str_replace(' ', '%20', $customPdfUrl);
-            }
+            $customPdfUrl = $this->uploadCustomPdf($request->file('custom_pdf'));
         }
 
         // Validate that template_id and message are not both provided
         if (!empty($templateId) && !empty($message)) {
-            return response()->json([
-                'message' => 'Cannot use both template_id and message. Please provide either template_id (for Content Template) or message (for plain text).',
-                'errors' => [
+            return ApiResponse::validationError(
+                [
                     'template_id' => ['Cannot use template with plain text message'],
                     'message' => ['Cannot use plain text message with template'],
                 ],
-            ], 422);
+                'Cannot use both template_id and message. Please provide either template_id (for Content Template) or message (for plain text).'
+            );
         }
 
         $results = $this->whatsAppService->sendPriceListToCustomers(
@@ -261,15 +201,12 @@ class WhatsAppController extends Controller
         $successCount = collect($results)->where('success', true)->count();
         $failureCount = count($results) - $successCount;
 
-        return response()->json([
-            'message' => "Sent to {$successCount} customer(s), {$failureCount} failed",
-            'data' => [
-                'total' => count($results),
-                'successful' => $successCount,
-                'failed' => $failureCount,
-                'results' => $results,
-            ],
-        ], 200);
+        return ApiResponse::success([
+            'total' => count($results),
+            'successful' => $successCount,
+            'failed' => $failureCount,
+            'results' => $results,
+        ], "Sent to {$successCount} customer(s), {$failureCount} failed");
     }
 
     /**
@@ -301,13 +238,13 @@ class WhatsAppController extends Controller
 
         // Validate that template_id and message are not both provided
         if (!empty($templateId) && !empty($message)) {
-            return response()->json([
-                'message' => 'Cannot use both template_id and message. Please provide either template_id (for Content Template) or message (for plain text).',
-                'errors' => [
+            return ApiResponse::validationError(
+                [
                     'template_id' => ['Cannot use template with plain text message'],
                     'message' => ['Cannot use plain text message with template'],
                 ],
-            ], 422);
+                'Cannot use both template_id and message. Please provide either template_id (for Content Template) or message (for plain text).'
+            );
         }
 
         // Validate that selected products match the product types (if provided)
@@ -318,12 +255,10 @@ class WhatsAppController extends Controller
             });
 
             if ($invalidProducts->isNotEmpty()) {
-                return response()->json([
-                    'message' => 'Some selected products do not match the selected product types',
-                    'errors' => [
-                        'product_ids' => ['Selected products must match the selected product types'],
-                    ],
-                ], 422);
+                return ApiResponse::validationError(
+                    ['product_ids' => ['Selected products must match the selected product types']],
+                    'Some selected products do not match the selected product types'
+                );
             }
         }
 
@@ -340,15 +275,12 @@ class WhatsAppController extends Controller
         $successCount = collect($results)->where('success', true)->count();
         $failureCount = count($results) - $successCount;
 
-        return response()->json([
-            'message' => "WhatsApp update sent to {$successCount} customer(s), {$failureCount} failed",
-            'data' => [
-                'total' => count($results),
-                'successful' => $successCount,
-                'failed' => $failureCount,
-                'results' => $results,
-            ],
-        ], 200);
+        return ApiResponse::success([
+            'total' => count($results),
+            'successful' => $successCount,
+            'failed' => $failureCount,
+            'results' => $results,
+        ], "WhatsApp update sent to {$successCount} customer(s), {$failureCount} failed");
     }
 
     /**
@@ -365,16 +297,143 @@ class WhatsAppController extends Controller
         $result = $this->whatsAppService->sendMessage($customer, $message);
 
         if (!$result['success']) {
-            return response()->json([
-                'message' => 'Failed to send message',
-                'error' => $result['error'],
-            ], 500);
+            return ApiResponse::error(
+                $result['error'] ?? 'Failed to send message',
+                $result,
+                500
+            );
         }
 
-        return response()->json([
-            'message' => 'Test message sent successfully',
-            'data' => $result,
-        ], 200);
+        return ApiResponse::success($result, 'Test message sent successfully');
+    }
+
+    /**
+     * Upload and store a custom PDF file securely.
+     *
+     * @param UploadedFile $file
+     * @return string PDF URL
+     * @throws MessageException
+     */
+    private function uploadCustomPdf(UploadedFile $file): string
+    {
+        // Validate file size (max 10MB)
+        $maxSize = 10 * 1024 * 1024; // 10MB in bytes
+        if ($file->getSize() > $maxSize) {
+            throw new MessageException('PDF file size exceeds maximum allowed size of 10MB');
+        }
+
+        // Validate MIME type
+        $allowedMimeTypes = ['application/pdf'];
+        $mimeType = $file->getMimeType();
+        if (!in_array($mimeType, $allowedMimeTypes)) {
+            throw new MessageException('Invalid file type. Only PDF files are allowed.');
+        }
+
+        // Validate file extension
+        $extension = strtolower($file->getClientOriginalExtension());
+        if ($extension !== 'pdf') {
+            throw new MessageException('Invalid file extension. Only PDF files are allowed.');
+        }
+
+        // Get original filename and sanitize it
+        $originalName = $file->getClientOriginalName();
+        
+        // Remove path traversal attempts and null bytes
+        $safeName = str_replace(['/', '\\', "\0", "\r", "\n"], '', $originalName);
+        
+        // Trim and normalize whitespace
+        $safeName = trim($safeName);
+        
+        // Replace spaces with hyphens
+        $safeName = preg_replace('/\s+/', '-', $safeName);
+        
+        // Remove all characters except alphanumeric, hyphens, underscores, and dots
+        $safeName = preg_replace('/[^A-Za-z0-9_\-\.]/', '', $safeName);
+        
+        // Ensure filename is not empty
+        if (empty($safeName)) {
+            $safeName = 'uploaded-pdf';
+        }
+        
+        // Ensure .pdf extension
+        if (!pathinfo($safeName, PATHINFO_EXTENSION)) {
+            $safeName .= '.pdf';
+        }
+        
+        // Limit filename length (max 255 characters including extension)
+        if (strlen($safeName) > 200) {
+            $pathInfo = pathinfo($safeName);
+            $nameWithoutExt = substr($pathInfo['filename'], 0, 200 - strlen($pathInfo['extension']) - 1);
+            $safeName = $nameWithoutExt . '.' . $pathInfo['extension'];
+        }
+        
+        // Generate unique filename with timestamp and random string
+        $timestamp = date('Y-m-d_H-i-s');
+        $randomString = bin2hex(random_bytes(4)); // 8 character random string
+        $filename = $timestamp . '_' . $randomString . '_' . $safeName;
+        $path = 'pdfs/' . $filename;
+        
+        // Store to media disk (consistent with regular PDFs)
+        $disk = Storage::disk('media');
+        
+        // Ensure pdfs directory exists
+        $directory = $disk->path('pdfs');
+        if (!is_dir($directory)) {
+            mkdir($directory, 0755, true);
+        }
+        
+        // Check if file already exists (unlikely with random string, but check anyway)
+        $counter = 1;
+        $baseFilename = $filename;
+        while ($disk->exists($path)) {
+            $pathInfo = pathinfo($baseFilename);
+            $nameWithoutExt = $pathInfo['filename'];
+            $ext = $pathInfo['extension'] ?? 'pdf';
+            $filename = $nameWithoutExt . '_' . $counter . '.' . $ext;
+            $path = 'pdfs/' . $filename;
+            $counter++;
+        }
+        
+        // Store the file using Laravel's safe file storage
+        try {
+            $stored = $disk->putFileAs('pdfs', $file, $filename);
+            
+            if (!$stored) {
+                throw new MessageException('Failed to store custom PDF file');
+            }
+            
+            // Verify file was stored and is readable
+            if (!$disk->exists($path)) {
+                throw new MessageException('Failed to verify custom PDF file storage');
+            }
+            
+            // Get the URL using PdfService (uses media disk)
+            $pdfUrl = $this->pdfService->getPdfUrl($path);
+            
+            // Ensure URL has no surrounding whitespace and encode spaces
+            if (empty($pdfUrl)) {
+                throw new MessageException('Failed to generate PDF URL');
+            }
+            
+            $pdfUrl = trim($pdfUrl);
+            $pdfUrl = str_replace(' ', '%20', $pdfUrl);
+            
+            Log::info('Custom PDF uploaded successfully', [
+                'filename' => $filename,
+                'path' => $path,
+                'size' => $file->getSize(),
+                'mime_type' => $mimeType,
+            ]);
+            
+            return $pdfUrl;
+        } catch (\Exception $e) {
+            Log::error('Failed to upload custom PDF', [
+                'error' => $e->getMessage(),
+                'filename' => $filename,
+            ]);
+            
+            throw new MessageException('Failed to upload PDF file: ' . (config('app.debug') ? $e->getMessage() : 'Please try again later.'));
+        }
     }
 
     /**
@@ -390,13 +449,11 @@ class WhatsAppController extends Controller
         $phoneNumber = $request->phone_number ?? $request->whatsapp_number;
         $isValid = $this->whatsAppService->validateWhatsAppNumber($phoneNumber);
 
-        return response()->json([
-            'data' => [
-                'valid' => $isValid,
-                'whatsapp_number' => $phoneNumber,
-                'formatted' => $isValid ? $phoneNumber : null,
-            ],
-        ], 200);
+        return ApiResponse::success([
+            'valid' => $isValid,
+            'whatsapp_number' => $phoneNumber,
+            'formatted' => $isValid ? $phoneNumber : null,
+        ]);
     }
 }
 

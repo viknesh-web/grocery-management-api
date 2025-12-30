@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\API;
 
+use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Customer;
@@ -42,38 +43,36 @@ class DashboardController extends Controller
         // Recent price changes
         $recentPriceChanges = PriceUpdate::with(['product'])->orderBy('created_at', 'desc')->limit(10)->get();
 
-            $data = [
-                'statistics' => [
-                    'products' => [
-                        'total' => $totalProducts,
-                        'active' => $activeProducts,
-                        'inactive' => $totalProducts - $activeProducts,
-                    ],
-                    'categories' => [
-                        'total' => $totalCategories,
-                        'active' => $activeCategories,
-                        'inactive' => $totalCategories - $activeCategories,
-                    ],
-                    'customers' => [
-                        'total' => $totalCustomers,
-                        'active' => $activeCustomers,
-                        'inactive' => $totalCustomers - $activeCustomers,
-                    ],
-                    'price_updates' => [
-                        'last_7_days' => $recentPriceUpdates,
-                    ],
-                    'low_stock_products' => $lowStockProducts,
-                    'product_types' => [
-                        'daily' => $dailyProducts,
-                        'standard' => $standardProducts,
-                    ],
+        $data = [
+            'statistics' => [
+                'products' => [
+                    'total' => $totalProducts,
+                    'active' => $activeProducts,
+                    'inactive' => $totalProducts - $activeProducts,
                 ],
-                'recent_price_changes' => $recentPriceChanges,
-            ];
+                'categories' => [
+                    'total' => $totalCategories,
+                    'active' => $activeCategories,
+                    'inactive' => $totalCategories - $activeCategories,
+                ],
+                'customers' => [
+                    'total' => $totalCustomers,
+                    'active' => $activeCustomers,
+                    'inactive' => $totalCustomers - $activeCustomers,
+                ],
+                'price_updates' => [
+                    'last_7_days' => $recentPriceUpdates,
+                ],
+                'low_stock_products' => $lowStockProducts,
+                'product_types' => [
+                    'daily' => $dailyProducts,
+                    'standard' => $standardProducts,
+                ],
+            ],
+            'recent_price_changes' => $recentPriceChanges,
+        ];
 
-        return response()->json([
-            'data' => $data,
-        ], 200);
+        return ApiResponse::success($data);
     }
 }
 

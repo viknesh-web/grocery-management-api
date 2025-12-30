@@ -2,6 +2,8 @@
 
 namespace App\Helper;
 
+use App\Helpers\PhoneNumberHelper;
+
 
 class DataNormalizer
 {
@@ -12,24 +14,7 @@ class DataNormalizer
         }
 
         if (isset($data['whatsapp_number'])) {
-            $whatsappNumber = trim((string) $data['whatsapp_number']);
-            $whatsappNumber = preg_replace('/[\s\-\(\)]/', '', $whatsappNumber);
-            
-            $validationCountry = strtoupper(config('phone.validation_country', 'AE'));
-            $countryRules = config("phone.rules.{$validationCountry}", config('phone.rules.AE'));
-            $countryCode = $countryRules['country_code'];
-            
-            if (!str_starts_with($whatsappNumber, '+')) {
-                if (str_starts_with($whatsappNumber, ltrim($countryCode, '+'))) {
-                    $whatsappNumber = '+' . $whatsappNumber;
-                } elseif (str_starts_with($whatsappNumber, '0')) {
-                    $whatsappNumber = $countryCode . substr($whatsappNumber, 1);
-                } else {
-                    $whatsappNumber = $countryCode . $whatsappNumber;
-                }
-            }
-            
-            $data['whatsapp_number'] = $whatsappNumber;
+            $data['whatsapp_number'] = PhoneNumberHelper::normalize($data['whatsapp_number']);
         }
 
         if (isset($data['address'])) {

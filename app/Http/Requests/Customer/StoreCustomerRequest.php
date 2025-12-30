@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Customer;
 
+use App\Helpers\PhoneNumberHelper;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -38,33 +39,7 @@ class StoreCustomerRequest extends FormRequest
 
         // Normalize WhatsApp number
         if ($this->has('whatsapp_number') && $this->whatsapp_number !== null && $this->whatsapp_number !== '') {
-            $whatsappNumber = trim((string) $this->whatsapp_number);
-            
-            // Remove spaces, dashes, and other formatting
-            $whatsappNumber = preg_replace('/[\s\-\(\)]/', '', $whatsappNumber);
-            
-            // Get validation country from config (default: AE for UAE)
-            $validationCountry = strtoupper(config('phone.validation_country', 'AE'));
-            $countryRules = config("phone.rules.{$validationCountry}", config('phone.rules.AE'));
-            $countryCode = $countryRules['country_code'];
-            
-            // Add + if not present
-            if (!str_starts_with($whatsappNumber, '+')) {
-                // If starts with country code without +, add +
-                if (str_starts_with($whatsappNumber, ltrim($countryCode, '+'))) {
-                    $whatsappNumber = '+' . $whatsappNumber;
-                }
-                // If starts with 0, remove leading 0 and add country code
-                elseif (str_starts_with($whatsappNumber, '0')) {
-                    $whatsappNumber = $countryCode . substr($whatsappNumber, 1);
-                }
-                // If no country code prefix, add country code
-                else {
-                    $whatsappNumber = $countryCode . $whatsappNumber;
-                }
-            }
-            
-            $dataToMerge['whatsapp_number'] = $whatsappNumber;
+            $dataToMerge['whatsapp_number'] = PhoneNumberHelper::normalize($this->whatsapp_number);
         }
 
         // Normalize address
@@ -103,10 +78,6 @@ class StoreCustomerRequest extends FormRequest
      */
     public function rules(): array
     {
-        // Get validation country from config (default: AE for UAE)
-        $validationCountry = strtoupper(config('phone.validation_country', 'AE'));
-        $countryRules = config("phone.rules.{$validationCountry}", config('phone.rules.AE'));
-        
         $rules = [
             'name' => [
                 'required',
@@ -118,7 +89,7 @@ class StoreCustomerRequest extends FormRequest
             'whatsapp_number' => [
                 'required',
                 'string',
-                'regex:' . $countryRules['regex'],
+                'regex:' . PhoneNumberHelper::getValidationRegex(),
                 'unique:customers,whatsapp_number',
             ],
             'landmark' => ['nullable', 'string', 'max:255'],
@@ -137,11 +108,8 @@ class StoreCustomerRequest extends FormRequest
      */
     public function messages(): array
     {
-        $validationCountry = strtoupper(config('phone.validation_country', 'IN'));
-        $countryRules = config("phone.rules.{$validationCountry}", config('phone.rules.IN'));
-        
         return [
-            'whatsapp_number.regex' => $countryRules['error_message'],
+            'whatsapp_number.regex' => PhoneNumberHelper::getValidationErrorMessage(),
             'name.regex' => 'Please enter a valid name (2-100 characters, letters only)',
         ];
     }

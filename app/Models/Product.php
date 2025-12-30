@@ -265,38 +265,70 @@ class Product extends Model
 
     /**
      * Scope a query to filter products with active discount.
+     * 
+     * @deprecated Use scopeWithActiveDiscount() instead
      */
     public function scopeWithDiscount($query)
     {
-        $now = Carbon::now();
+        return $this->scopeWithActiveDiscount($query);
+    }
+
+    /**
+     * Scope a query to filter products without active discount.
+     * 
+     * @deprecated Use scopeWithoutActiveDiscount() instead
+     */
+    public function scopeWithoutDiscount($query)
+    {
+        return $this->scopeWithoutActiveDiscount($query);
+    }
+
+    /**
+     * Scope a query to filter products with active discount (handles date-range logic).
+     * 
+     * A discount is considered active if:
+     * - status is 'active'
+     * - start_date is null or <= current date
+     * - end_date is null or >= current date
+     */
+    public function scopeWithActiveDiscount($query, ?Carbon $date = null)
+    {
+        $now = $date ?? Carbon::now();
+        
         return $query->whereHas('discounts', function ($q) use ($now) {
             $q->where('status', 'active')
                 ->where(function ($query) use ($now) {
                     $query->whereNull('start_date')
-                        ->orWhere('start_date', '<=', $now)
-                        ->where(function ($q) use ($now) {
-                            $q->whereNull('end_date')
-                                ->orWhere('end_date', '>=', $now);
-                        });
+                        ->orWhere('start_date', '<=', $now);
+                })
+                ->where(function ($q) use ($now) {
+                    $q->whereNull('end_date')
+                        ->orWhere('end_date', '>=', $now);
                 });
         });
     }
 
     /**
-     * Scope a query to filter products without active discount.
+     * Scope a query to filter products without active discount (handles date-range logic).
+     * 
+     * A product is considered without active discount if:
+     * - It has no discounts, OR
+     * - All its discounts are inactive (status != 'active'), OR
+     * - All its active discounts are outside the current date range
      */
-    public function scopeWithoutDiscount($query)
+    public function scopeWithoutActiveDiscount($query, ?Carbon $date = null)
     {
-        $now = Carbon::now();
+        $now = $date ?? Carbon::now();
+        
         return $query->whereDoesntHave('discounts', function ($q) use ($now) {
             $q->where('status', 'active')
                 ->where(function ($query) use ($now) {
                     $query->whereNull('start_date')
-                        ->orWhere('start_date', '<=', $now)
-                        ->where(function ($q) use ($now) {
-                            $q->whereNull('end_date')
-                                ->orWhere('end_date', '>=', $now);
-                        });
+                        ->orWhere('start_date', '<=', $now);
+                })
+                ->where(function ($q) use ($now) {
+                    $q->whereNull('end_date')
+                        ->orWhere('end_date', '>=', $now);
                 });
         });
     }

@@ -5,29 +5,34 @@ namespace App\Validator;
 use App\Models\Category;
 use Illuminate\Validation\Rule;
 
-class CategoryValidator
+class CategoryValidator extends BaseValidator
 {
     public static function onCreate(): array
     {
         return [
-            'name' => ['required', 'string', 'max:255', 'min:2', 'unique:categories,name'],
-            'description' => ['nullable', 'string', 'max:1000'],
-            'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048'],
-            'status' => ['sometimes', 'string', Rule::in(['active', 'inactive'])],
+            'name' => array_merge(
+                self::nameRules(true),
+                [Rule::unique('categories', 'name')]
+            ),
+            'description' => self::descriptionRules(),
+            'image' => self::imageRules(false),
+            'status' => self::statusRules(),
         ];
     }
 
     public static function onUpdate(?int $id = null): array
     {
         return [
-            'name' => ['sometimes', 'required', 'string', 'max:255', 'min:2', Rule::unique('categories', 'name')->ignore($id)],
-            'description' => ['nullable', 'string', 'max:1000'],
-            'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048'],
+            'name' => array_merge(
+                self::nameRules(false),
+                [Rule::unique('categories', 'name')->ignore($id)]
+            ),
+            'description' => self::descriptionRules(),
+            'image' => self::imageRules(false),
             'image_removed' => ['sometimes', 'boolean'],
-            'status' => ['sometimes', 'string', Rule::in(['active', 'inactive'])],
+            'status' => self::statusRules(),
         ];
     }
-
 }
 
 

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Helpers\PhoneNumberHelper;
 use App\Models\Customer;
 use App\Services\PdfService;
 use Illuminate\Support\Facades\Log;
@@ -47,19 +48,31 @@ class WhatsAppService
             }
         }
 
-        // If no customer IDs provided, send to all active customers
+        // Process customers in chunks to avoid memory issues with large lists
         if ($customerIds === null || empty($customerIds)) {
-            $customers = Customer::where('active', true)->get();
+            // Send to all active customers in chunks
+            Customer::where('status', 'active')
+                ->chunk(100, function ($customers) use (&$results, $customMessage, $pdfUrl, $templateId, $contentVariables) {
+                    foreach ($customers as $customer) {
+                        $result = $this->sendMessage($customer, $customMessage, $pdfUrl, $templateId, $contentVariables);
+                        $results[] = array_merge([
+                            'customer_id' => $customer->id,
+                            'customer_name' => $customer->name,
+                        ], $result);
+                    }
+                });
         } else {
-            $customers = Customer::whereIn('id', $customerIds)->get();
-        }
-
-        foreach ($customers as $customer) {
-            $result = $this->sendMessage($customer, $customMessage, $pdfUrl, $templateId, $contentVariables);
-            $results[] = array_merge([
-                'customer_id' => $customer->id,
-                'customer_name' => $customer->name,
-            ], $result);
+            // Process specific customer IDs in chunks
+            Customer::whereIn('id', $customerIds)
+                ->chunk(100, function ($customers) use (&$results, $customMessage, $pdfUrl, $templateId, $contentVariables) {
+                    foreach ($customers as $customer) {
+                        $result = $this->sendMessage($customer, $customMessage, $pdfUrl, $templateId, $contentVariables);
+                        $results[] = array_merge([
+                            'customer_id' => $customer->id,
+                            'customer_name' => $customer->name,
+                        ], $result);
+                    }
+                });
         }
 
         return $results;
@@ -72,19 +85,10 @@ class WhatsAppService
             $fromNumber = $this->whatsappNumber;
 
             // Ensure customer WhatsApp number format is correct
-            $toNumber = $customer->whatsapp_number;
-            if (!str_starts_with($toNumber, 'whatsapp:')) {
-                // Remove any spaces or dashes, ensure it starts with +
-                $cleaned = preg_replace('/[^\d+]/', '', $toNumber);
-                if (!str_starts_with($cleaned, '+')) {
-                    // If it's a 10-digit Indian number, add +91
-                    if (strlen($cleaned) === 10) {
-                        $cleaned = '+91' . $cleaned;
-                    } else {
-                        $cleaned = '+' . $cleaned;
-                    }
-                }
-                $toNumber = 'whatsapp:' . $cleaned;
+            $toNumber = PhoneNumberHelper::formatForWhatsApp($customer->whatsapp_number);
+            
+            if (empty($toNumber)) {
+                throw new \Exception('Invalid customer WhatsApp number format');
             }
 
             Log::info('Sending WhatsApp message', [
@@ -158,6 +162,9 @@ class WhatsAppService
                 $errorMessage = 'Invalid "from" phone number. Please check your Twilio WhatsApp number configuration.';
             } elseif ($errorCode === 20003) {
                 $errorMessage = 'Twilio authentication failed. Please check your Account SID and Auth Token.';
+            } else {
+                // Generic error message for unknown Twilio errors
+                $errorMessage = 'Failed to send WhatsApp message. Please try again later.';
             }
             
             Log::error('WhatsApp message failed (Twilio Error)', [
@@ -175,7 +182,7 @@ class WhatsAppService
                 'success' => false,
                 'error' => $errorMessage,
                 'error_code' => $errorCode,
-                'twilio_error' => $e->getMessage(),
+                'twilio_error' => config('app.debug') ? $e->getMessage() : null,
             ];
         } catch (\Exception $e) {
             Log::error('WhatsApp message failed (General Error)', [
@@ -188,21 +195,21 @@ class WhatsAppService
                 'trace' => $e->getTraceAsString(),
             ]);
 
+            $errorMessage = config('app.debug') 
+                ? $e->getMessage() 
+                : 'Failed to send WhatsApp message. Please try again later.';
+
             return [
                 'success' => false,
-                'error' => $e->getMessage(),
-                'error_code' => $e->getCode(),
+                'error' => $errorMessage,
+                'error_code' => config('app.debug') ? $e->getCode() : null,
             ];
         }
     }
 
     public function validateWhatsAppNumber(string $number): bool
     {
-        // Remove any non-digit characters except +
-        $cleaned = preg_replace('/[^\d+]/', '', $number);
-
-        // Check if it starts with + and has valid format
-        return preg_match('/^\+[1-9]\d{1,14}$/', $cleaned) === 1;
+        return PhoneNumberHelper::validate($number);
     }
 }
 

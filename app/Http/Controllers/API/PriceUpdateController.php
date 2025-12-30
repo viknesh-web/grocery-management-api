@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\API;
 
+use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\PriceUpdate\BulkPriceUpdateRequest;
 use App\Models\PriceUpdate;
@@ -70,9 +71,7 @@ class PriceUpdateController extends Controller
 
         $products = $query->with(['category:id,name'])->orderBy('name')->get();
         
-        return response()->json([
-            'data' => $products
-        ], 200);
+        return ApiResponse::success($products);
     }
 
     /**
@@ -86,17 +85,14 @@ class PriceUpdateController extends Controller
         );
 
         if (!$result['success']) {
-            return response()->json([
-                'message' => 'Price update failed',
-                'error' => $result['error'],
-                'data' => $result,
-            ], 500);
+            return ApiResponse::error(
+                $result['error'] ?? 'Price update failed',
+                $result,
+                500
+            );
         }
 
-        return response()->json([
-            'message' => "Successfully updated {$result['updated']} product(s)",
-            'data' => $result,
-        ], 200);
+        return ApiResponse::success($result, "Successfully updated {$result['updated']} product(s)");
     }
 
     /**
@@ -107,12 +103,10 @@ class PriceUpdateController extends Controller
         $limit = $request->get('limit', 50);
         $history = $this->priceUpdateService->getProductPriceHistory($product->id, $limit);
 
-        return response()->json([
-            'data' => [
-                'product' => $product,
-                'history' => $history,
-            ],
-        ], 200);
+        return ApiResponse::success([
+            'product' => $product,
+            'history' => $history,
+        ]);
     }
 
     /**
@@ -130,9 +124,7 @@ class PriceUpdateController extends Controller
             $request->end_date
         );
 
-        return response()->json([
-            'data' => $updates,
-        ], 200);
+        return ApiResponse::success($updates);
     }
 
     /**
@@ -143,9 +135,7 @@ class PriceUpdateController extends Controller
         $limit = $request->get('limit', 20);
         $updates = PriceUpdate::with(['product', 'updater'])->orderBy('created_at', 'desc')->limit($limit)->get();
 
-        return response()->json([
-            'data' => $updates,
-        ], 200);
+        return ApiResponse::success($updates);
     }
 }
 

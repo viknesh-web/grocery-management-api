@@ -4,9 +4,11 @@ namespace App\Http\Controllers\API;
 
 use App\Exceptions\MessageException;
 use App\Helper\DataNormalizer;
+use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
-use App\Http\Resources\Category\CategoryCollection;
 use App\Http\Resources\Product\ProductCollection;
+use App\Http\Traits\HasImageUpload;
+use App\Http\Traits\HasStatusToggle;
 use App\Services\CategoryService;
 use App\Validator\CategoryValidator;
 use Illuminate\Http\JsonResponse;
@@ -15,11 +17,13 @@ use Illuminate\Support\Facades\Validator;
 
 class CategoryController extends Controller
 {
+    use HasImageUpload, HasStatusToggle;
+
     public function __construct(
         private CategoryService $categoryService
     ) {}
 
-    public function index(Request $request): CategoryCollection
+    public function index(Request $request)
     {
         $filters = [
             'active' => $request->get('active'),
@@ -33,7 +37,7 @@ class CategoryController extends Controller
         $perPage = $request->get('per_page', 15);
         $categories = $this->categoryService->getPaginated($filters, $perPage);
 
-        return new CategoryCollection($categories);
+        return ApiResponse::paginated($categories);
     }
 
     public function store(Request $request)
@@ -49,12 +53,7 @@ class CategoryController extends Controller
         try {
             $category = $this->categoryService->create($data, $request->file('image'), $request->user()->id);
             
-            $response = [
-                'message' => 'Category created successfully',
-                'data' => $category,
-            ];
-
-            return response()->json($response);
+            return ApiResponse::success($category, 'Category created successfully', 201);
         } catch (\Exception $e) {
             report($e);
             throw new \Exception("Unable to create category");
@@ -66,9 +65,7 @@ class CategoryController extends Controller
         $category = $request->get('category');
         $category->load(['creator', 'updater', 'parent']);
         
-        return response()->json([
-            'data' => $category,
-        ]);
+        return ApiResponse::success($category);
     }
 
     public function update(Request $request)
@@ -86,13 +83,7 @@ class CategoryController extends Controller
         try {
             $category = $this->categoryService->update($category, $data, $request->file('image'), $request->boolean('image_removed', false), $request->user()->id);
             
-            $response = [
-                'message' => 'Category updated successfully',
-                'data' => $category,
-            ];
-
-            return response()->json($response);
-
+            return ApiResponse::success($category, 'Category updated successfully');
         } catch (\Exception $e) {
             report($e);
             throw new \Exception("Unable to update category");
@@ -106,12 +97,7 @@ class CategoryController extends Controller
         try {
             $this->categoryService->delete($category);
             
-            $response = [
-                'message' => 'Category deleted successfully',
-            ];
-
-            return response()->json($response);
-
+            return ApiResponse::success(null, 'Category deleted successfully');
         } catch (\Exception $e) {
             report($e);
             throw new \Exception("Unable to delete category");
@@ -121,48 +107,33 @@ class CategoryController extends Controller
     public function toggleStatus(Request $request)
     {
         $category = $request->get('category');
-        $category = $this->categoryService->toggleStatus($category, $request->user()->id);
+        $category = $this->toggleModelStatus($category, $this->categoryService, $request->user()->id);
         
-        $response = [
-            'message' => 'Category status updated successfully',
-            'data' => $category,
-        ];
-
-        return response()->json($response);
+        return ApiResponse::success($category, 'Category status updated successfully');
     }
 
     public function reorder(Request $request)
     {
         // Display order is no longer supported in the schema
         // This endpoint is kept for API compatibility but does nothing
-        $response = [
-            'message' => 'Category reordering is no longer supported',
-        ];
-
-        return response()->json($response);
+        return ApiResponse::success(null, 'Category reordering is no longer supported');
     }
 
     public function search(Request $request, string $query)
     {
         $categories = $this->categoryService->search($query);
 
-        return response()->json([
-            'data' => $categories,
-        ]);
+        return ApiResponse::success($categories);
     }
 
     public function tree(Request $request)
     {
         $categories = $this->categoryService->getTree();
         
-        $response = [
-            'data' => $categories,
-        ];
-
-        return response()->json($response);
+        return ApiResponse::success($categories);
     }
 
-    public function products(Request $request): ProductCollection
+    public function products(Request $request)
     {
         $category = $request->get('category');
         $filters = [
@@ -175,6 +146,6 @@ class CategoryController extends Controller
         $perPage = $request->get('per_page', 15);
         $products = $this->categoryService->getProducts($category, $filters, $perPage);
 
-        return new ProductCollection($products);
+        return ApiResponse::paginated($products);
     }
 }

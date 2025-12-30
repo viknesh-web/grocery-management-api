@@ -5,22 +5,22 @@ namespace App\Validator;
 use App\Models\Product;
 use Illuminate\Validation\Rule;
 
-class ProductValidator
+class ProductValidator extends BaseValidator
 {
     private static function baseRules(): array
     {
         return [
-            'name' => ['string', 'min:2', 'max:255'],
+            'name' => self::nameRules(false),
             'item_code' => ['string', 'max:100'],
             'category_id' => ['integer', 'exists:categories,id'],
-            'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048'],
+            'image' => self::imageRules(false),
             'regular_price' => ['numeric', 'min:0', 'max:999999.99'],
             'discount_type' => [Rule::in(['percentage', 'fixed', 'none'])],
             'discount_start_date' => ['nullable', 'date'],
             'discount_end_date' => ['nullable', 'date', 'after_or_equal:discount_start_date'],
             'stock_quantity' => ['numeric', 'min:0', 'max:999999.99'],
             'stock_unit' => [Rule::in(['Kg', 'Pieces', 'Units', 'L'])],
-            'status' => [Rule::in(['active', 'inactive'])],
+            'status' => self::statusRules(),
             'product_type' => [Rule::in(['daily', 'standard'])],
         ];
     }
@@ -41,21 +41,21 @@ class ProductValidator
 
     public static function onIndex(): array
     {
-        return [
-            'search' => ['sometimes', 'string', 'max:255'],
-            'category_id' => ['sometimes', 'integer', 'exists:categories,id'],
-            'product_type' => ['sometimes', 'string', 'in:daily,standard'],
-            'status' => ['sometimes', 'string', 'in:active,inactive'],
-            'has_discount' => ['sometimes', 'boolean'],
-            'stock_status' => ['sometimes', 'string', 'in:in_stock,low_stock,out_of_stock'],
-            'sort_by' => ['sometimes', 'string', 'in:name,regular_price,selling_price,stock_quantity,created_at,product_type'],
-            'sort_order' => ['sometimes', 'string', 'in:asc,desc'],
-            'page' => ['sometimes', 'integer', 'min:1'],
-            'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
-        ];
+        return array_merge(
+            [
+                'search' => ['sometimes', 'string', 'max:255'],
+                'category_id' => ['sometimes', 'integer', 'exists:categories,id'],
+                'product_type' => ['sometimes', 'string', 'in:daily,standard'],
+                'status' => self::statusRules(),
+                'has_discount' => ['sometimes', 'boolean'],
+                'stock_status' => ['sometimes', 'string', 'in:in_stock,low_stock,out_of_stock'],
+            ],
+            self::sortingRules(['name', 'regular_price', 'selling_price', 'stock_quantity', 'created_at', 'product_type']),
+            self::paginationRules()
+        );
     }
 
-    public static function onUpdate(int $id): array
+    public static function onUpdate(?int $id = null): array
     {
         return array_merge(self::baseRules(), [
             'name' => ['sometimes', 'required'],

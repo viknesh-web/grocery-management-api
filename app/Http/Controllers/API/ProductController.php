@@ -4,7 +4,10 @@ namespace App\Http\Controllers\API;
 
 use App\Exceptions\MessageException;
 use App\Helper\DataNormalizer;
+use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
+use App\Http\Traits\HasImageUpload;
+use App\Http\Traits\HasStatusToggle;
 use App\Services\ProductService;
 use App\Validator\ProductValidator;
 use Illuminate\Http\JsonResponse;
@@ -13,6 +16,8 @@ use Illuminate\Support\Facades\Validator;
 
 class ProductController extends Controller
 {
+    use HasImageUpload, HasStatusToggle;
+
     public function __construct(
         private ProductService $productService
     ) {}
@@ -40,27 +45,10 @@ class ProductController extends Controller
         $filtersApplied = property_exists($products, 'filters_applied') ? $products->filters_applied : [];
         $totalFiltered = property_exists($products, 'total_filtered') ? $products->total_filtered : $products->total();
         
-        $response = [
-            'data' => $products->items(),
-            'meta' => [
-                'current_page' => $products->currentPage(),
-                'from' => $products->firstItem(),
-                'last_page' => $products->lastPage(),
-                'per_page' => $products->perPage(),
-                'to' => $products->lastItem(),
-                'total' => $products->total(),
-                'filters_applied' => $filtersApplied,
-                'total_filtered' => $totalFiltered,
-            ],
-            'links' => [
-                'first' => $products->url(1),
-                'last' => $products->url($products->lastPage()),
-                'prev' => $products->previousPageUrl(),
-                'next' => $products->nextPageUrl(),
-            ],
-        ];
-
-        return response()->json($response, 200);
+        return ApiResponse::paginated($products, [
+            'filters_applied' => $filtersApplied,
+            'total_filtered' => $totalFiltered,
+        ]);
     }
 
     public function store(Request $request)
@@ -76,12 +64,7 @@ class ProductController extends Controller
         try {
             $product = $this->productService->create($data, $request->file('image'), $request->user()->id);
             
-            $response = [
-                'message' => 'Product created successfully',
-                'data' => $product,
-            ];
-
-            return response()->json($response, 201);
+            return ApiResponse::success($product, 'Product created successfully', 201);
         } catch (\Exception $e) {
             report($e);
             throw new MessageException("Unable to create product");
@@ -93,9 +76,7 @@ class ProductController extends Controller
         $product = $request->get('product');
         $product->load(['creator', 'updater', 'category']);
         
-        return response()->json([
-            'data' => $product,
-        ]);
+        return ApiResponse::success($product);
     }
 
     public function update(Request $request)
@@ -113,12 +94,7 @@ class ProductController extends Controller
         try {
             $product = $this->productService->update($product, $data, $request->file('image'), $request->boolean('image_removed', false), $request->user()->id);
             
-            $response = [
-                'message' => 'Product updated successfully',
-                'data' => $product,
-            ];
-
-            return response()->json($response);
+            return ApiResponse::success($product, 'Product updated successfully');
         } catch (\Exception $e) {
             report($e);
             throw new MessageException("Unable to update product");
@@ -132,11 +108,7 @@ class ProductController extends Controller
         try {
             $this->productService->delete($product);
             
-            $response = [
-                'message' => 'Product deleted successfully',
-            ];
-
-            return response()->json($response);
+            return ApiResponse::success(null, 'Product deleted successfully');
         } catch (\Exception $e) {
             report($e);
             throw new MessageException("Unable to delete product");
@@ -146,14 +118,9 @@ class ProductController extends Controller
     public function toggleStatus(Request $request)
     {
         $product = $request->get('product');
-        $product = $this->productService->toggleStatus($product, $request->user()->id);
+        $product = $this->toggleModelStatus($product, $this->productService, $request->user()->id);
         
-        $response = [
-            'message' => 'Product status updated successfully',
-            'data' => $product,
-        ];
-
-        return response()->json($response);
+        return ApiResponse::success($product, 'Product status updated successfully');
     }
 
 }

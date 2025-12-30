@@ -4,7 +4,7 @@ namespace App\Validator;
 
 use Illuminate\Validation\Rule;
 
-class CustomerValidator
+class CustomerValidator extends BaseValidator
 {
     public static function onCreate(): array
     {
@@ -12,16 +12,17 @@ class CustomerValidator
         $validationCountry = strtoupper(config('phone.validation_country', 'AE'));
         $countryRules = config("phone.rules.{$validationCountry}", config('phone.rules.AE'));
 
-        $rules = [
-            'name' => ['required', 'string', 'min:2', 'max:100', 'regex:/^[a-zA-Z\s\-\']+$/'],
+        return [
+            'name' => array_merge(
+                self::nameRules(true, 2, 100),
+                ['regex:/^[a-zA-Z\s\-\']+$/']
+            ),
             'whatsapp_number' => ['required', 'string', 'regex:' . $countryRules['regex'], 'unique:customers,whatsapp_number'],
             'landmark' => ['nullable', 'string', 'max:255'],
-            'remarks' => ['nullable', 'string', 'max:1000'],
-            'status' => ['sometimes', 'string', Rule::in(['active', 'inactive'])],
+            'remarks' => self::descriptionRules(),
+            'status' => self::statusRules(),
             'address' => ['nullable', 'string', 'max:1000'],
         ];
-
-        return $rules;
     }
 
     public static function onUpdate(?int $id = null): array
@@ -30,18 +31,19 @@ class CustomerValidator
         $validationCountry = strtoupper(config('phone.validation_country', 'AE'));
         $countryRules = config("phone.rules.{$validationCountry}", config('phone.rules.AE'));
 
-        $rules = [
-            'name' => ['sometimes', 'required', 'string', 'min:2', 'max:100', 'regex:/^[a-zA-Z\s\-\']+$/'],
+        return [
+            'name' => array_merge(
+                self::nameRules(false, 2, 100),
+                ['regex:/^[a-zA-Z\s\-\']+$/']
+            ),
             'whatsapp_number' => ['sometimes', 'required', 'string', 'regex:' . $countryRules['regex'], Rule::unique('customers', 'whatsapp_number')->ignore($id)],
             'landmark' => ['nullable', 'string', 'max:255'],
-            'remarks' => ['nullable', 'string', 'max:1000'],
+            'remarks' => self::descriptionRules(),
             'active' => ['sometimes', 'boolean'],
             // Always accept both address and area fields
             'address' => ['sometimes', 'nullable', 'string', 'max:1000'],
             'area' => ['sometimes', 'nullable', 'string', 'max:255'],
         ];
-
-        return $rules;
     }
 
     public static function messages(): array

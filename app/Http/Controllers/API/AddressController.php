@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\API;
 
+use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
 use App\Models\Address;
 use App\Services\AddressService;
@@ -23,19 +24,29 @@ class AddressController extends Controller
     }  
 
     /**
-     * Search UAE areas using Nominatim API.
+     * Search UAE areas using Geoapify API.
      */
     public function searchUAE(Request $request)
     {
         $validated = $request->validate([
-            'query' => ['required', 'string', 'max:100'],
+            'query' => ['required', 'string', 'min:2', 'max:100'],
         ]);
 
-        $areas = $this->addressService->searchUAEAreas($validated['query']);
-
-        return response()->json([
-            'data' => $areas,
-        ], 200);
+        try {
+            $areas = $this->addressService->searchUAEAreas($validated['query']);
+            return ApiResponse::success($areas);
+        } catch (\InvalidArgumentException $e) {
+            return ApiResponse::validationError(
+                ['query' => [$e->getMessage()]],
+                'Invalid search query'
+            );
+        } catch (\Exception $e) {
+            return ApiResponse::error(
+                'Unable to search addresses. Please try again later.',
+                null,
+                500
+            );
+        }
     }
 }
 

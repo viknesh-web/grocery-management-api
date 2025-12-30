@@ -3,8 +3,9 @@
 namespace App\Http\Controllers\API;
 
 use App\Helper\DataNormalizer;
+use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
-use App\Http\Resources\Customer\CustomerCollection;
+use App\Http\Traits\HasStatusToggle;
 use App\Models\Customer;
 use App\Services\CustomerService;
 use App\Validator\CustomerValidator;
@@ -14,11 +15,13 @@ use Illuminate\Support\Facades\Validator;
 
 class CustomerController extends Controller
 {
+    use HasStatusToggle;
+
     public function __construct(
         private CustomerService $customerService
     ) {}
 
-    public function index(Request $request): CustomerCollection
+    public function index(Request $request)
     {
         $filters = [
             'search' => $request->get('search'),
@@ -30,7 +33,7 @@ class CustomerController extends Controller
         $perPage = $request->get('per_page', 15);
         $customers = $this->customerService->getPaginated($filters, $perPage);
 
-        return new CustomerCollection($customers);
+        return ApiResponse::paginated($customers);
     }
 
     public function store(Request $request)
@@ -40,14 +43,9 @@ class CustomerController extends Controller
         $data = DataNormalizer::normalizeCustomer($data);
 
         try {
-            $customer = $this->customerService->create($data,
-                $request->user()->id
-            );
+            $customer = $this->customerService->create($data, $request->user()->id);
 
-            return response()->json([
-                'message' => 'Customer created successfully',
-                'data' => $customer,
-            ], 201);
+            return ApiResponse::success($customer, 'Customer created successfully', 201);
         } catch (\Exception $e) {
             report($e);
             throw new \Exception("Unable to create customer");
@@ -59,14 +57,10 @@ class CustomerController extends Controller
         $customer = $this->customerService->find($customer->id);
 
         if (!$customer) {
-            return response()->json([
-                'message' => 'Customer not found',
-            ], 404);
+            return ApiResponse::notFound('Customer not found');
         }
 
-        return response()->json([
-            'data' => $customer,
-        ], 200);
+        return ApiResponse::success($customer);
     }
 
     public function update(Request $request, Customer $customer)
@@ -76,16 +70,9 @@ class CustomerController extends Controller
         $data = DataNormalizer::normalizeCustomer($data, $customer->id);
 
         try {
-            $customer = $this->customerService->update(
-                $customer,
-                $data,
-                $request->user()->id
-            );
+            $customer = $this->customerService->update($customer, $data, $request->user()->id);
 
-            return response()->json([
-                'message' => 'Customer updated successfully',
-                'data' => $customer,
-            ], 200);
+            return ApiResponse::success($customer, 'Customer updated successfully');
         } catch (\Exception $e) {
             report($e);
             throw new \Exception("Unable to update customer");
@@ -97,7 +84,7 @@ class CustomerController extends Controller
         try {
             $this->customerService->delete($customer);
 
-            return response()->json(['message' => 'Customer deleted successfully'], 200);
+            return ApiResponse::success(null, 'Customer deleted successfully');
         } catch (\Exception $e) {
             report($e);
             throw new \Exception("Unable to delete customer");
@@ -106,12 +93,9 @@ class CustomerController extends Controller
 
     public function toggleStatus(Request $request, Customer $customer)
     {
-        $customer = $this->customerService->toggleStatus($customer, $request->user()->id);
+        $customer = $this->toggleModelStatus($customer, $this->customerService, $request->user()->id);
 
-        return response()->json([
-            'message' => 'Customer status updated successfully',
-            'data' => $customer,
-        ], 200);
+        return ApiResponse::success($customer, 'Customer status updated successfully');
     }
 
 }
