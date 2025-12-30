@@ -15,6 +15,10 @@ class ProductResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        if (!$this->resource || !$this->id) {
+            return [];
+        }
+
         $discountActive = $this->isDiscountActive();
         $activeDiscount = $this->activeDiscount();
 

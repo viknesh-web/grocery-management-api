@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Address;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class AddressService
@@ -15,18 +16,18 @@ class AddressService
      */
     public function searchUAEAreas(string $query): array
     {
-
         $cacheKey = 'uae_areas:' . md5($query);
             
         try {
             $apiKey = env('GEOAPIFY_API_KEY');
+            $baseUrl = config('services.geoapify.base_url');
             
             if (empty($apiKey)) {
                 throw new \Exception("GEOAPIFY_API_KEY not configured");
                 return [];
             }
             
-            $baseUrl = 'https://api.geoapify.com/v1/geocode/autocomplete';
+            // Build URL with query parameters for Geoapify
             $params = http_build_query([
                 'text' => $query,
                 'apiKey' => $apiKey,
@@ -49,26 +50,16 @@ class AddressService
             $error = curl_error($ch);
             curl_close($ch);
             
-
-            if ($error) {
-                Log::error('cURL Error: ' . $error);
-                return [];
-            }
-            
-            if ($httpCode !== 200) {
-                Log::error('Non-200 response: ' . $httpCode);
-                Log::error('Response body: ' . $response);
-                return [];
+            if ($error || $httpCode !== 200) {
+               return [ 'success' => false, 'message' => 'Unable to connect to address service' ];
             }
             
             $data = json_decode($response, true);
             
             if (json_last_error() !== JSON_ERROR_NONE) {
-                Log::error('JSON decode error: ' . json_last_error_msg());
-                return [];
+                return [ 'success' => false, 'message' => 'Invalid response from address service' ];
             }
             
-            // Geoapify returns results in 'features' array
             $results = $data['features'] ?? [];
             
             if (empty($results)) {
@@ -90,11 +81,8 @@ class AddressService
                 $city = $properties['city'] ?? null;
                 $emirate = $properties['state'] ?? null;
                 $fullAddress = $properties['formatted'] ?? null;
-
-                // Build area name
                 $areaName = $areaCandidate ?? $city ?? $fullAddress;
                 
-                // Build address line with street number, building, apartment, street
                 $addressLine = [];
                 if ($houseNumber) {
                     $addressLine[] = $houseNumber;
@@ -109,17 +97,14 @@ class AddressService
                     $addressLine[] = 'Apt ' . $apartment;
                 }
                 
-                // Combine area with address details for better searchability and display
-                // This ensures street numbers are included in the area field which is searchable
                 $displayArea = $areaName;
                 if (!empty($addressLine)) {
                     $addressLineStr = implode(' ', $addressLine);
-                    // Prepend address details to area for better searchability (e.g., "123 Main St, Dubai Marina")
                     $displayArea = trim($addressLineStr . ', ' . $displayArea);
                 }
 
                 return [
-                    'area' => $displayArea, // Includes street number for searchability
+                    'area' => $displayArea,
                     'city' => $city,
                     'emirate' => $emirate,
                     'full_address' => $fullAddress,
@@ -127,7 +112,7 @@ class AddressService
                     'house_number' => $houseNumber,
                     'building' => $building,
                     'apartment' => $apartment,
-                    'area_base' => $areaName, // Original area name without street details
+                    'area_base' => $areaName
                 ];
             })->filter(fn($item) => !empty($item['area']))->unique('area')->values()->toArray();
                 
@@ -137,7 +122,6 @@ class AddressService
             
         } catch (\Exception $e) {
             throw new \Exception("Unable to fetch UAE areas");
-            return [];
         }
     }
 }

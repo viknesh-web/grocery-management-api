@@ -247,7 +247,6 @@ class WhatsAppController extends Controller
             ], 422);
         }
 
-        Log::debug('customPdfUrl: ' . ($customPdfUrl ?? 'null'));
         $results = $this->whatsAppService->sendPriceListToCustomers(
             $customerIds,
             $message,

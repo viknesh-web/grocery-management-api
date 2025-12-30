@@ -49,10 +49,8 @@ class CustomerController extends Controller
                 'data' => $customer,
             ], 201);
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to create customer',
-                'error' => $e->getMessage(),
-            ], 500);
+            report($e);
+            throw new \Exception("Unable to create customer");
         }
     }
 
@@ -89,10 +87,8 @@ class CustomerController extends Controller
                 'data' => $customer,
             ], 200);
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to update customer',
-                'error' => $e->getMessage(),
-            ], 500);
+            report($e);
+            throw new \Exception("Unable to update customer");
         }
     }
 
@@ -103,10 +99,8 @@ class CustomerController extends Controller
 
             return response()->json(['message' => 'Customer deleted successfully'], 200);
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to delete customer',
-                'error' => $e->getMessage(),
-            ], 500);
+            report($e);
+            throw new \Exception("Unable to delete customer");
         }
     }
 
