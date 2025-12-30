@@ -23,7 +23,7 @@ class DashboardController extends Controller
     public function index(Request $request): JsonResponse
     {
         $totalProducts = Product::count();
-        $activeProducts = Product::enabled()->count();
+        $activeProducts = Product::where('status', 'active')->count();
         $totalCategories = Category::count();
         $activeCategories = Category::active()->count();
         $totalCustomers = Customer::count();
@@ -33,7 +33,7 @@ class DashboardController extends Controller
         $recentPriceUpdates = PriceUpdate::where('created_at', '>=', now()->subDays(7))->count();
 
         // Low stock products (less than 10)
-        $lowStockProducts = Product::where('stock_quantity', '<', 10)->enabled()->count();
+        $lowStockProducts = Product::where('stock_quantity', '<', 10)->where('status', 'active')->count();
 
         // Product type statistics
         $dailyProducts = Product::where('product_type', 'daily')->count();

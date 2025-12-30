@@ -29,7 +29,7 @@ class PriceUpdateController extends Controller
      */
     public function getProducts(Request $request): JsonResponse
     {
-        $query = Product::enabled();
+        $query = Product::where('status', 'active');
 
         // Search
         if ($request->has('search')) {

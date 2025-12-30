@@ -15,40 +15,17 @@ class Customer extends Model
         'name',
         'whatsapp_number',
         'address',
-        'area',
         'landmark',
         'remarks',
-        'active',
-        'created_by',
-        'updated_by',
+        'status',
     ];
-
-    protected $casts = [
-        'active' => 'boolean',
-    ];
-
-    /**
-     * Get the user who created the customer.
-     */
-    public function creator(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'created_by');
-    }
-
-    /**
-     * Get the user who last updated the customer.
-     */
-    public function updater(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'updated_by');
-    }
 
     /**
      * Scope a query to only include active customers.
      */
     public function scopeActive($query)
     {
-        return $query->where('active', true);
+        return $query->where('status', 'active');
     }
 
     /**

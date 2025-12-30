@@ -2,7 +2,6 @@
 
 namespace App\Helper;
 
-use Illuminate\Support\Str;
 
 class DataNormalizer
 {
@@ -39,12 +38,6 @@ class DataNormalizer
                 : null;
         }
 
-        if (isset($data['area'])) {
-            $data['area'] = ($data['area'] !== null && $data['area'] !== '') 
-                ? trim((string) $data['area']) 
-                : null;
-        }
-
         if (isset($data['landmark'])) {
             $data['landmark'] = trim((string) $data['landmark']);
         }
@@ -53,10 +46,12 @@ class DataNormalizer
             $data['remarks'] = trim((string) $data['remarks']);
         }
 
-        if (isset($data['active'])) {
-            $data['active'] = (bool) $data['active'];
+        if (isset($data['status'])) {
+            if (!in_array($data['status'], ['active', 'inactive'])) {
+                $data['status'] = $customerId === null ? 'active' : 'inactive';
+            }
         } elseif ($customerId === null) {
-            $data['active'] = true;
+            $data['status'] = 'active';
         }
 
         return $data;
@@ -66,36 +61,18 @@ class DataNormalizer
     {
         if (isset($data['name'])) {
             $data['name'] = trim((string) $data['name']);
-            
-            if (!isset($data['slug']) || empty($data['slug'])) {
-                $data['slug'] = Str::slug($data['name']);
-            }
-        }
-
-        if (isset($data['slug'])) {
-            $data['slug'] = Str::slug(trim((string) $data['slug']));
         }
 
         if (isset($data['description'])) {
             $data['description'] = trim((string) $data['description']);
         }
 
-        if (isset($data['is_active'])) {
-            $data['is_active'] = (bool) $data['is_active'];
-        } elseif ($categoryId === null) {
-            $data['is_active'] = true;
-        }
-
-        if (isset($data['display_order']) && $data['display_order'] !== null && $data['display_order'] !== '') {
-            $data['display_order'] = (int) $data['display_order'];
-        }
-
-        if (isset($data['parent_id'])) {
-            if ($data['parent_id'] !== null && $data['parent_id'] !== '') {
-                $data['parent_id'] = (int) $data['parent_id'];
-            } else {
-                $data['parent_id'] = null;
+        if (isset($data['status'])) {
+            if (!in_array($data['status'], ['active', 'inactive'])) {
+                $data['status'] = $categoryId === null ? 'active' : 'inactive';
             }
+        } elseif ($categoryId === null) {
+            $data['status'] = 'active';
         }
 
         return $data;
@@ -111,8 +88,8 @@ class DataNormalizer
             $data['item_code'] = strtoupper(trim((string) $data['item_code']));
         }
 
-        if (isset($data['original_price'])) {
-            $data['original_price'] = (float) $data['original_price'];
+        if (isset($data['regular_price'])) {
+            $data['regular_price'] = (float) $data['regular_price'];
         }
 
         if (isset($data['discount_value'])) {
@@ -129,10 +106,12 @@ class DataNormalizer
             $data['discount_type'] = $data['discount_type'] ?? 'none';
         }
 
-        if (isset($data['enabled'])) {
-            $data['enabled'] = (bool) $data['enabled'];
+        if (isset($data['status'])) {
+            if (!in_array($data['status'], ['active', 'inactive'])) {
+                $data['status'] = $productId === null ? 'active' : 'inactive';
+            }
         } elseif ($productId === null) {
-            $data['enabled'] = true;
+            $data['status'] = 'active';
         }
 
         return $data;

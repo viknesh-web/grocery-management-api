@@ -18,21 +18,11 @@ class CategoryResource extends JsonResource
         return [
             'id' => $this->id,
             'name' => $this->name,
-            'slug' => $this->slug,
             'description' => $this->description,
             'image' => $this->image,
             'image_url' => $this->image_url,
-            'is_active' => $this->is_active,
-            'parent_id' => $this->parent_id,
-            'parent' => $this->whenLoaded('parent', function () {
-                return new CategoryResource($this->parent);
-            }),
-            'children' => $this->whenLoaded('children', function () {
-                return CategoryResource::collection($this->children);
-            }),
+            'status' => $this->status,
             'products_count' => $this->products_count,
-            'is_parent' => $this->is_parent,
-            'full_path' => $this->full_path,
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
             // 'created_by' => $this->whenLoaded('creator', function () {

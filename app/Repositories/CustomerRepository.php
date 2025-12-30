@@ -30,8 +30,8 @@ class CustomerRepository implements CustomerRepositoryInterface
         }
 
         // Apply filters
-        if (isset($filters['active'])) {
-            $query->where('active', (bool) $filters['active']);
+        if (isset($filters['status']) && in_array($filters['status'], ['active', 'inactive'])) {
+            $query->where('status', $filters['status']);
         }
 
         if (isset($filters['search'])) {
@@ -39,7 +39,7 @@ class CustomerRepository implements CustomerRepositoryInterface
                 $q->where('name', 'like', '%' . $filters['search'] . '%')
                   ->orWhere('whatsapp_number', 'like', '%' . $filters['search'] . '%')
                   ->orWhere('address', 'like', '%' . $filters['search'] . '%')
-                  ->orWhere('area', 'like', '%' . $filters['search'] . '%');
+                  ->orWhere('landmark', 'like', '%' . $filters['search'] . '%');
             });
         }
 
@@ -68,8 +68,8 @@ class CustomerRepository implements CustomerRepositoryInterface
         }
 
         // Apply filters
-        if (isset($filters['active'])) {
-            $query->where('active', (bool) $filters['active']);
+        if (isset($filters['status']) && in_array($filters['status'], ['active', 'inactive'])) {
+            $query->where('status', $filters['status']);
         }
 
         if (isset($filters['search'])) {
@@ -77,7 +77,7 @@ class CustomerRepository implements CustomerRepositoryInterface
                 $q->where('name', 'like', '%' . $filters['search'] . '%')
                   ->orWhere('whatsapp_number', 'like', '%' . $filters['search'] . '%')
                   ->orWhere('address', 'like', '%' . $filters['search'] . '%')
-                  ->orWhere('area', 'like', '%' . $filters['search'] . '%');
+                  ->orWhere('landmark', 'like', '%' . $filters['search'] . '%');
             });
         }
 
@@ -160,7 +160,7 @@ class CustomerRepository implements CustomerRepositoryInterface
             $q->where('name', 'like', '%' . $query . '%')
               ->orWhere('whatsapp_number', 'like', '%' . $query . '%')
               ->orWhere('address', 'like', '%' . $query . '%')
-              ->orWhere('area', 'like', '%' . $query . '%');
+              ->orWhere('landmark', 'like', '%' . $query . '%');
         })->get();
     }
 
@@ -172,7 +172,7 @@ class CustomerRepository implements CustomerRepositoryInterface
      */
     public function getActive(array $relations = []): Collection
     {
-        $query = Customer::where('active', true);
+        $query = Customer::where('status', 'active');
 
         if (!empty($relations)) {
             $query->with($relations);

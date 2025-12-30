@@ -27,7 +27,7 @@ class ProductController extends Controller
             'category_id' => $request->get('category_id'),
             'product_type' => $request->get('product_type'),
             'status' => $request->get('status'),
-            'enabled' => $request->get('enabled'),
+            'status' => $request->get('status'),
             'has_discount' => $request->get('has_discount'),
             'stock_status' => $request->get('stock_status'),
             'sort_by' => $request->get('sort_by', 'created_at'),
@@ -156,15 +156,4 @@ class ProductController extends Controller
         return response()->json($response);
     }
 
-    public function getVariations(Request $request): JsonResponse
-    {
-        $product = $request->get('product');
-        $variations = $product->activeVariations()->get();
-        
-        $response = [
-            'data' => $variations,
-        ];
-
-        return response()->json($response);
-    }
 }

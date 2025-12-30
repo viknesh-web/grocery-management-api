@@ -26,7 +26,7 @@ class CategoryController extends Controller
             'root' => $request->boolean('root'),
             'parent_id' => $request->get('parent_id'),
             'search' => $request->get('search'),
-            'sort_by' => $request->get('sort_by', 'display_order'),
+            'sort_by' => $request->get('sort_by', 'name'),
             'sort_order' => $request->get('sort_order', 'asc'),
         ];
 
@@ -133,16 +133,10 @@ class CategoryController extends Controller
 
     public function reorder(Request $request): JsonResponse
     {
-        $request->validate([
-            'categories' => ['required', 'array'],
-            'categories.*.id' => ['required', 'integer', 'exists:categories,id'],
-            'categories.*.display_order' => ['required', 'integer', 'min:0'],
-        ]);
-
-        $this->categoryService->reorder($request->categories);
-        
+        // Display order is no longer supported in the schema
+        // This endpoint is kept for API compatibility but does nothing
         $response = [
-            'message' => 'Categories reordered successfully',
+            'message' => 'Category reordering is no longer supported',
         ];
 
         return response()->json($response);
@@ -173,7 +167,7 @@ class CategoryController extends Controller
         $category = $request->get('category');
         $filters = [
             'search' => $request->get('search'),
-            'enabled' => $request->get('enabled'),
+            'status' => $request->get('status'),
             'sort_by' => $request->get('sort_by', 'created_at'),
             'sort_order' => $request->get('sort_order', 'desc'),
         ];

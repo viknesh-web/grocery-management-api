@@ -58,7 +58,6 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::put('/', [ProductController::class, 'update']);
             Route::delete('/', [ProductController::class, 'destroy']);
             Route::post('/toggle-status', [ProductController::class, 'toggleStatus']);
-            Route::get('/variations', [ProductController::class, 'getVariations']);
         });
     });
 

@@ -29,13 +29,13 @@ class PriceUpdateService
                 }
 
                 // Store old values
-                $oldOriginalPrice = $product->original_price;
+                $oldRegularPrice = $product->regular_price;
                 $oldDiscountType = $product->discount_type;
                 $oldDiscountValue = $product->discount_value;
                 $oldStockQuantity = $product->stock_quantity;
 
                 // Update product
-                $product->original_price = $update['original_price'] ?? $product->original_price;
+                $product->regular_price = $update['regular_price'] ?? $product->regular_price;
                 $product->discount_type = $update['discount_type'] ?? $product->discount_type;
                 $product->discount_value = $update['discount_value'] ?? $product->discount_value;
                 $product->stock_quantity = $update['stock_quantity'] ?? $product->stock_quantity;
@@ -43,7 +43,7 @@ class PriceUpdateService
                 $product->save();
 
                 // Create price update log only if relevant fields actually changed
-                $hasChanges = ($oldOriginalPrice != $product->original_price) ||
+                $hasChanges = ($oldRegularPrice != $product->regular_price) ||
                     ($oldDiscountType != $product->discount_type) ||
                     ($oldDiscountValue != $product->discount_value) ||
                     ($oldStockQuantity != $product->stock_quantity);
@@ -54,8 +54,8 @@ class PriceUpdateService
 
                     PriceUpdate::create([
                         'product_id' => $product->id,
-                        'old_original_price' => $oldOriginalPrice,
-                        'new_original_price' => $product->original_price,
+                        'old_regular_price' => $oldRegularPrice,
+                        'new_regular_price' => $product->regular_price,
                         'old_discount_type' => $oldDiscountType,
                         'new_discount_type' => $product->discount_type,
                         'old_discount_value' => $oldDiscountValue,

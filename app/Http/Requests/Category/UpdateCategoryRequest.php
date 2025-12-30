@@ -4,7 +4,6 @@ namespace App\Http\Requests\Category;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use Illuminate\Support\Str;
 
 /**
  * Update Category Request
@@ -37,16 +36,6 @@ class UpdateCategoryRequest extends FormRequest
         // Normalize name
         if ($this->has('name') && $this->name !== null && $this->name !== '') {
             $dataToMerge['name'] = trim((string) $this->name);
-            
-            // Auto-generate slug from name if slug not provided
-            if (!isset($this->slug) || empty($this->slug)) {
-                $dataToMerge['slug'] = Str::slug($dataToMerge['name']);
-            }
-        }
-
-        // Normalize slug
-        if ($this->has('slug') && $this->slug !== null && $this->slug !== '') {
-            $dataToMerge['slug'] = Str::slug(trim((string) $this->slug));
         }
 
         // Normalize description
@@ -54,22 +43,9 @@ class UpdateCategoryRequest extends FormRequest
             $dataToMerge['description'] = trim((string) $this->description);
         }
 
-        if ($this->has('is_active')) {
-            $dataToMerge['is_active'] = $this->boolean('is_active');
-        }
-
-        // Normalize display_order (no default for updates)
-        if ($this->has('display_order') && $this->display_order !== null && $this->display_order !== '') {
-            $dataToMerge['display_order'] = (int) $this->display_order;
-        }
-
-        // Normalize parent_id
-        if ($this->has('parent_id')) {
-            if ($this->parent_id !== null && $this->parent_id !== '') {
-                $dataToMerge['parent_id'] = (int) $this->parent_id;
-            } else {
-                $dataToMerge['parent_id'] = null;
-            }
+        // Normalize status (no default for updates)
+        if ($this->has('status') && in_array($this->status, ['active', 'inactive'])) {
+            $dataToMerge['status'] = $this->status;
         }
 
         if (!empty($dataToMerge)) {
@@ -88,17 +64,10 @@ class UpdateCategoryRequest extends FormRequest
 
         return [
             'name' => ['sometimes', 'required', 'string', 'max:255', 'min:2', Rule::unique('categories', 'name')->ignore($categoryId)],
-            'slug' => ['nullable', 'string', 'max:255', Rule::unique('categories', 'slug')->ignore($categoryId)],
             'description' => ['nullable', 'string', 'max:1000'],
             'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048'],
             'image_removed' => ['sometimes', 'boolean'],
-            'is_active' => ['sometimes', 'boolean'],
-            'display_order' => ['nullable', 'integer', 'min:0', 'max:9999'],
-            'parent_id' => [
-                'nullable',
-                'integer',
-                'exists:categories,id',
-            ],
+            'status' => ['sometimes', 'string', Rule::in(['active', 'inactive'])],
         ];
     }
 }

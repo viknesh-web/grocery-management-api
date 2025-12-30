@@ -17,10 +17,8 @@ class CustomerValidator
             'whatsapp_number' => ['required', 'string', 'regex:' . $countryRules['regex'], 'unique:customers,whatsapp_number'],
             'landmark' => ['nullable', 'string', 'max:255'],
             'remarks' => ['nullable', 'string', 'max:1000'],
-            'active' => ['sometimes', 'boolean'],
-            // Always accept both address and area fields
+            'status' => ['sometimes', 'string', Rule::in(['active', 'inactive'])],
             'address' => ['nullable', 'string', 'max:1000'],
-            'area' => ['nullable', 'string', 'max:255'],
         ];
 
         return $rules;

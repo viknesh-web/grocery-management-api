@@ -14,13 +14,13 @@ class ProductValidator
             'item_code' => ['string', 'max:100'],
             'category_id' => ['integer', 'exists:categories,id'],
             'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048'],
-            'original_price' => ['numeric', 'min:0', 'max:999999.99'],
+            'regular_price' => ['numeric', 'min:0', 'max:999999.99'],
             'discount_type' => [Rule::in(['percentage', 'fixed', 'none'])],
             'discount_start_date' => ['nullable', 'date'],
             'discount_end_date' => ['nullable', 'date', 'after_or_equal:discount_start_date'],
             'stock_quantity' => ['numeric', 'min:0', 'max:999999.99'],
             'stock_unit' => [Rule::in(['Kg', 'Pieces', 'Units', 'L'])],
-            'enabled' => ['boolean'],
+            'status' => [Rule::in(['active', 'inactive'])],
             'product_type' => [Rule::in(['daily', 'standard'])],
         ];
     }
@@ -31,7 +31,7 @@ class ProductValidator
             'name' => ['required'],
             'item_code' => ['required', Rule::unique('products', 'item_code')],
             'category_id' => ['required'],
-            'original_price' => ['required'],
+            'regular_price' => ['required'],
             'stock_quantity' => ['required'],
             'stock_unit' => ['required'],
             'discount_type' => ['sometimes'],
@@ -45,11 +45,10 @@ class ProductValidator
             'search' => ['sometimes', 'string', 'max:255'],
             'category_id' => ['sometimes', 'integer', 'exists:categories,id'],
             'product_type' => ['sometimes', 'string', 'in:daily,standard'],
-            'status' => ['sometimes', 'string', 'in:enabled,disabled'],
-            'enabled' => ['sometimes', 'boolean'],
+            'status' => ['sometimes', 'string', 'in:active,inactive'],
             'has_discount' => ['sometimes', 'boolean'],
             'stock_status' => ['sometimes', 'string', 'in:in_stock,low_stock,out_of_stock'],
-            'sort_by' => ['sometimes', 'string', 'in:name,original_price,selling_price,stock_quantity,created_at,product_type'],
+            'sort_by' => ['sometimes', 'string', 'in:name,regular_price,selling_price,stock_quantity,created_at,product_type'],
             'sort_order' => ['sometimes', 'string', 'in:asc,desc'],
             'page' => ['sometimes', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
@@ -95,10 +94,10 @@ class ProductValidator
                 }
 
                 if ($type === 'fixed') {
-                    $price = $request->input('original_price');
+                    $price = $request->input('regular_price');
 
                     if (!$price && $id) {
-                        $price = Product::whereKey($id)->value('original_price');
+                        $price = Product::whereKey($id)->value('regular_price');
                     }
 
                     if ($price && $value >= $price) {
