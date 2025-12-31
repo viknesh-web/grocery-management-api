@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Exceptions\ServiceException;
+use App\Exceptions\ValidationException;
 use App\Helpers\PhoneNumberHelper;
 use App\Models\Customer;
 use App\Services\PdfService;
@@ -31,12 +33,10 @@ class WhatsAppService
         $this->whatsappNumber = $whatsappNumber;
     }
 
-    public function sendPriceListToCustomers(?array $customerIds = null, ?string $customMessage = null, bool $includePdf = true, ?array $productIds = null, ?string $templateId = null, ?array $contentVariables = null, ?string $customPdfUrl = null, string $pdfLayout = 'regular'): array
+    public function sendPriceListToCustomers(?array $customerIds = null, ?string $customMessage = null, bool $includePdf = true, ?array $productIds = null, ?string $templateId = null, ?array $contentVariables = null, ?string $customPdfUrl = null, string $pdfLayout = 'regular', bool $async = true): array
     {
-        $results = [];
-        $pdfUrl = null;
-        
         // Generate PDF if needed
+        $pdfUrl = null;
         if ($includePdf) {
             if ($customPdfUrl !== null) {
                 // Use custom uploaded PDF
@@ -48,17 +48,51 @@ class WhatsAppService
             }
         }
 
+        // If async, dispatch batch job
+        if ($async) {
+            \App\Jobs\WhatsAppMessageBatch::dispatch(
+                $customerIds,
+                $customMessage,
+                $pdfUrl,
+                $templateId,
+                $contentVariables
+            );
+
+            // Return immediate response
+            $customerCount = $customerIds 
+                ? count($customerIds) 
+                : Customer::where('status', 'active')->count();
+
+            return [
+                'status' => 'queued',
+                'message' => "Messages queued for {$customerCount} customer(s)",
+                'customer_count' => $customerCount,
+            ];
+        }
+
+        // Fallback to synchronous sending (existing code)
+        $results = [];
+        
         // Process customers in chunks to avoid memory issues with large lists
         if ($customerIds === null || empty($customerIds)) {
             // Send to all active customers in chunks
             Customer::where('status', 'active')
                 ->chunk(100, function ($customers) use (&$results, $customMessage, $pdfUrl, $templateId, $contentVariables) {
                     foreach ($customers as $customer) {
-                        $result = $this->sendMessage($customer, $customMessage, $pdfUrl, $templateId, $contentVariables);
-                        $results[] = array_merge([
-                            'customer_id' => $customer->id,
-                            'customer_name' => $customer->name,
-                        ], $result);
+                        try {
+                            $result = $this->sendMessage($customer, $customMessage, $pdfUrl, $templateId, $contentVariables);
+                            $results[] = array_merge([
+                                'customer_id' => $customer->id,
+                                'customer_name' => $customer->name,
+                            ], $result);
+                        } catch (\Throwable $e) {
+                            $results[] = [
+                                'customer_id' => $customer->id,
+                                'customer_name' => $customer->name,
+                                'success' => false,
+                                'error' => $e->getMessage(),
+                            ];
+                        }
                     }
                 });
         } else {
@@ -66,11 +100,20 @@ class WhatsAppService
             Customer::whereIn('id', $customerIds)
                 ->chunk(100, function ($customers) use (&$results, $customMessage, $pdfUrl, $templateId, $contentVariables) {
                     foreach ($customers as $customer) {
-                        $result = $this->sendMessage($customer, $customMessage, $pdfUrl, $templateId, $contentVariables);
-                        $results[] = array_merge([
-                            'customer_id' => $customer->id,
-                            'customer_name' => $customer->name,
-                        ], $result);
+                        try {
+                            $result = $this->sendMessage($customer, $customMessage, $pdfUrl, $templateId, $contentVariables);
+                            $results[] = array_merge([
+                                'customer_id' => $customer->id,
+                                'customer_name' => $customer->name,
+                            ], $result);
+                        } catch (\Throwable $e) {
+                            $results[] = [
+                                'customer_id' => $customer->id,
+                                'customer_name' => $customer->name,
+                                'success' => false,
+                                'error' => $e->getMessage(),
+                            ];
+                        }
                     }
                 });
         }
@@ -88,7 +131,10 @@ class WhatsAppService
             $toNumber = PhoneNumberHelper::formatForWhatsApp($customer->whatsapp_number);
             
             if (empty($toNumber)) {
-                throw new \Exception('Invalid customer WhatsApp number format');
+                throw new ValidationException(
+                    'Invalid customer WhatsApp number format',
+                    ['whatsapp_number' => ['Invalid WhatsApp number format']]
+                );
             }
 
             Log::info('Sending WhatsApp message', [
@@ -178,12 +224,7 @@ class WhatsAppService
                 'twilio_status' => method_exists($e, 'getStatusCode') ? $e->getStatusCode() : null,
             ]);
 
-            return [
-                'success' => false,
-                'error' => $errorMessage,
-                'error_code' => $errorCode,
-                'twilio_error' => config('app.debug') ? $e->getMessage() : null,
-            ];
+            throw new ServiceException($errorMessage);
         } catch (\Exception $e) {
             Log::error('WhatsApp message failed (General Error)', [
                 'customer_id' => $customer->id,
@@ -199,11 +240,7 @@ class WhatsAppService
                 ? $e->getMessage() 
                 : 'Failed to send WhatsApp message. Please try again later.';
 
-            return [
-                'success' => false,
-                'error' => $errorMessage,
-                'error_code' => config('app.debug') ? $e->getCode() : null,
-            ];
+            throw new ServiceException($errorMessage);
         }
     }
 

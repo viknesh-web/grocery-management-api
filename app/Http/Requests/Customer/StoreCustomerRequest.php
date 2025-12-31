@@ -60,8 +60,9 @@ class StoreCustomerRequest extends FormRequest
             $dataToMerge['remarks'] = trim((string) $this->remarks);
         }
 
-        if ($this->has('active')) {
-            $dataToMerge['active'] = $this->boolean('active');
+        // Normalize status with default
+        if ($this->has('status') && in_array($this->status, ['active', 'inactive'])) {
+            $dataToMerge['status'] = $this->status;
         } else {
             $dataToMerge['status'] = 'active';
         }

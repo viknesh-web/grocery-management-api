@@ -3,9 +3,10 @@
 namespace App\Repositories;
 
 use App\Models\Product;
-use App\Services\ProductFilterService;
+use App\Services\CacheService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Product Repository
@@ -14,9 +15,6 @@ use Illuminate\Database\Eloquent\Collection;
  */
 class ProductRepository
 {
-    public function __construct(
-        private ProductFilterService $filterService
-    ) {}
 
     /**
      * Get all products with optional filters and relations.
@@ -27,7 +25,11 @@ class ProductRepository
      */
     public function all(array $filters = [], array $relations = []): Collection
     {
-        return $this->buildQuery($filters, $relations)->get();
+        $cacheKey = CacheService::productListKey($filters);
+        
+        return Cache::remember($cacheKey, CacheService::TTL_MEDIUM, function () use ($filters, $relations) {
+            return $this->buildQuery($filters, $relations)->get();
+        });
     }
 
     /**
@@ -52,19 +54,13 @@ class ProductRepository
      */
     private function buildQuery(array $filters = [], array $relations = [])
     {
-        $query = Product::query();
-
-        if (!empty($relations)) {
-            $query->with($relations);
-        }
-
-        $query = $this->filterService->applyFilters($query, $filters);
-
-        return $this->filterService->applySorting(
-            $query,
-            $filters['sort_by'] ?? 'created_at',
-            $filters['sort_order'] ?? 'desc'
-        );
+        return Product::query()
+            ->filter($filters) // Use model scope!
+            ->when(!empty($relations), fn($q) => $q->with($relations))
+            ->sortBy(
+                $filters['sort_by'] ?? 'created_at',
+                $filters['sort_order'] ?? 'desc'
+            ); // Use model scope!
     }
 
 
@@ -77,13 +73,9 @@ class ProductRepository
      */
     public function search(string $query, array $relations = []): Collection
     {
-        $builder = Product::query();
-
-        if (!empty($relations)) {
-            $builder->with($relations);
-        }
-
-        return $builder->search($query)->get();
+        return Product::search($query) // Use scope!
+            ->when(!empty($relations), fn($q) => $q->with($relations))
+            ->get();
     }
 
     /**
@@ -94,13 +86,13 @@ class ProductRepository
      */
     public function getEnabled(array $relations = []): Collection
     {
-        $query = Product::enabled();
-
-        if (!empty($relations)) {
-            $query->with($relations);
-        }
-
-        return $query->get();
+        $cacheKey = CacheService::productListKey(['status' => 'active']);
+        
+        return Cache::remember($cacheKey, CacheService::TTL_LONG, function () use ($relations) {
+            return Product::active() // Use scope!
+                ->when(!empty($relations), fn($q) => $q->with($relations))
+                ->get();
+        });
     }
 
     /**
@@ -114,19 +106,17 @@ class ProductRepository
      */
     public function getByCategory(int $categoryId, array $filters = [], int $perPage = 15, array $relations = []): LengthAwarePaginator
     {
-        $query = Product::where('category_id', $categoryId);
+        // Set category_id in filters to use the filter scope
+        $filters['category_id'] = $categoryId;
 
-        if (!empty($relations)) {
-            $query->with($relations);
-        }
-
-        $query = $this->filterService->applyFilters($query, $filters);
-
-        return $this->filterService->applySorting(
-            $query,
-            $filters['sort_by'] ?? 'created_at',
-            $filters['sort_order'] ?? 'desc'
-        )->paginate($perPage);
+        return Product::query()
+            ->filter($filters) // Use scope!
+            ->when(!empty($relations), fn($q) => $q->with($relations))
+            ->sortBy(
+                $filters['sort_by'] ?? 'created_at',
+                $filters['sort_order'] ?? 'desc'
+            ) // Use scope!
+            ->paginate($perPage);
     }
 
 }

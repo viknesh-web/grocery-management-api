@@ -5,6 +5,8 @@ namespace App\Http\Controllers\API;
 use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\PriceUpdate\BulkPriceUpdateRequest;
+use App\Http\Resources\PriceUpdateResource;
+use App\Http\Resources\ProductResource;
 use App\Models\PriceUpdate;
 use App\Models\Product;
 use App\Services\PriceUpdateService;
@@ -71,7 +73,10 @@ class PriceUpdateController extends Controller
 
         $products = $query->with(['category:id,name'])->orderBy('name')->get();
         
-        return ApiResponse::success($products);
+        return response()->json([
+            'success' => true,
+            'data' => ProductResource::collection($products),
+        ]);
     }
 
     /**
@@ -102,10 +107,16 @@ class PriceUpdateController extends Controller
     {
         $limit = $request->get('limit', 50);
         $history = $this->priceUpdateService->getProductPriceHistory($product->id, $limit);
+        
+        // Load relationships if needed
+        $history->load('updater');
 
-        return ApiResponse::success([
-            'product' => $product,
-            'history' => $history,
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'product' => new ProductResource($product),
+                'history' => PriceUpdateResource::collection($history),
+            ],
         ]);
     }
 
@@ -123,8 +134,13 @@ class PriceUpdateController extends Controller
             $request->start_date,
             $request->end_date
         );
+        
+        $updates->load('product', 'updater');
 
-        return ApiResponse::success($updates);
+        return response()->json([
+            'success' => true,
+            'data' => PriceUpdateResource::collection($updates),
+        ]);
     }
 
     /**
@@ -135,7 +151,10 @@ class PriceUpdateController extends Controller
         $limit = $request->get('limit', 20);
         $updates = PriceUpdate::with(['product', 'updater'])->orderBy('created_at', 'desc')->limit($limit)->get();
 
-        return ApiResponse::success($updates);
+        return response()->json([
+            'success' => true,
+            'data' => PriceUpdateResource::collection($updates),
+        ]);
     }
 }
 

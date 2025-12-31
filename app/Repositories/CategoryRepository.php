@@ -3,8 +3,10 @@
 namespace App\Repositories;
 
 use App\Models\Category;
+use App\Services\CacheService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Category Repository
@@ -22,7 +24,11 @@ class CategoryRepository
      */
     public function all(array $filters = [], array $relations = []): Collection
     {
-        return $this->query($filters, $relations)->get();
+        $cacheKey = CacheService::categoryListKey($filters);
+        
+        return Cache::remember($cacheKey, CacheService::TTL_LONG, function () use ($filters, $relations) {
+            return $this->query($filters, $relations)->get();
+        });
     }
 
     /**
@@ -55,33 +61,15 @@ class CategoryRepository
      */
     private function query(array $filters = [], array $relations = [])
     {
-        $query = Category::query();
-
-        // Apply relations
-        if (!empty($relations)) {
-            $query->with($relations);
+        // Handle legacy 'active' filter
+        if (isset($filters['active']) && !isset($filters['status'])) {
+            $filters['status'] = filter_var($filters['active'], FILTER_VALIDATE_BOOLEAN) ? 'active' : 'inactive';
         }
 
-        // Apply filters
-        if (isset($filters['active'])) {
-            $status = filter_var($filters['active'], FILTER_VALIDATE_BOOLEAN) ? 'active' : 'inactive';
-            $query->where('status', $status);
-        }
-
-        if (isset($filters['status']) && in_array($filters['status'], ['active', 'inactive'])) {
-            $query->where('status', $filters['status']);
-        }
-
-        if (isset($filters['search'])) {
-            $query->search($filters['search']);
-        }
-
-        // Apply sorting
-        $sortBy = $filters['sort_by'] ?? 'name';
-        $sortOrder = $filters['sort_order'] ?? 'asc';
-        $query->orderBy($sortBy, $sortOrder);
-
-        return $query;
+        return Category::query()
+            ->filter($filters) // Use scope!
+            ->when(!empty($relations), fn($q) => $q->with($relations))
+            ->ordered(); // Use scope!
     }
 
 
@@ -94,21 +82,11 @@ class CategoryRepository
      */
     public function search(string $query, array $relations = []): Collection
     {
-        $builder = Category::query();
-        $builder->where('name', 'like', "%{$query}%");
-
-        if (!empty($relations)) {
-            $builder->with($relations);
-        }
-
-        $categories = $builder->orderBy('name', 'asc')->get();
-
-        $categories->transform(function ($category) {
-            $category->products_count = $category->products()->count();
-            return $category;
-        });
-
-        return $categories;
+        return Category::search($query) // Use scope!
+            ->when(!empty($relations), fn($q) => $q->with($relations))
+            ->withProductCount() // Use scope!
+            ->ordered()
+            ->get();
     }
 
     /**
@@ -119,13 +97,10 @@ class CategoryRepository
      */
     public function getRootCategories(array $relations = []): Collection
     {
-        $query = Category::active()->orderBy('name', 'asc');
-
-        if (!empty($relations)) {
-            $query->with($relations);
-        }
-
-        return $query->get();
+        return Category::active() // Use scope!
+            ->when(!empty($relations), fn($q) => $q->with($relations))
+            ->ordered()
+            ->get();
     }
 
     /**
@@ -136,13 +111,14 @@ class CategoryRepository
      */
     public function getActiveCategories(array $relations = []): Collection
     {
-        $query = Category::active();
-
-        if (!empty($relations)) {
-            $query->with($relations);
-        }
-
-        return $query->get();
+        $cacheKey = CacheService::categoryListKey(['status' => 'active']);
+        
+        return Cache::remember($cacheKey, CacheService::TTL_DAY, function () use ($relations) {
+            return Category::active() // Use scope!
+                ->when(!empty($relations), fn($q) => $q->with($relations))
+                ->ordered()
+                ->get();
+        });
     }
 
     /**

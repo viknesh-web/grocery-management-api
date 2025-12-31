@@ -4,6 +4,7 @@ namespace App\Http\Controllers\API;
 
 use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\UserResource;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -36,15 +37,15 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
-        return ApiResponse::success([
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
+        return response()->json([
+            'success' => true,
+            'message' => 'User registered successfully',
+            'data' => [
+                'user' => new UserResource($user),
+                'token' => $token,
+                'token_type' => 'Bearer',
             ],
-            'token' => $token,
-            'token_type' => 'Bearer',
-        ], 'User registered successfully', 201);
+        ], 201);
     }
 
     /**
@@ -67,15 +68,15 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
-        return ApiResponse::success([
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
+        return response()->json([
+            'success' => true,
+            'message' => 'Login successful',
+            'data' => [
+                'user' => new UserResource($user),
+                'token' => $token,
+                'token_type' => 'Bearer',
             ],
-            'token' => $token,
-            'token_type' => 'Bearer',
-        ], 'Login successful');
+        ]);
     }
 
     /**
@@ -83,11 +84,10 @@ class AuthController extends Controller
      */
     public function user(Request $request)
     {
-        return ApiResponse::success([
-            'user' => [
-                'id' => $request->user()->id,
-                'name' => $request->user()->name,
-                'email' => $request->user()->email,
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'user' => new UserResource($request->user()),
             ],
         ]);
     }
@@ -109,13 +109,13 @@ class AuthController extends Controller
             'email' => $validated['email'],
         ]);
 
-        return ApiResponse::success([
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
+        return response()->json([
+            'success' => true,
+            'message' => 'Profile updated successfully',
+            'data' => [
+                'user' => new UserResource($user),
             ],
-        ], 'Profile updated successfully');
+        ]);
     }
 
     /**

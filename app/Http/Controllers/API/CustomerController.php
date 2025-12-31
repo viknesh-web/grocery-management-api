@@ -2,16 +2,16 @@
 
 namespace App\Http\Controllers\API;
 
-use App\Helper\DataNormalizer;
 use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Customer\StoreCustomerRequest;
+use App\Http\Requests\Customer\UpdateCustomerRequest;
+use App\Http\Resources\CustomerCollection;
+use App\Http\Resources\CustomerResource;
 use App\Http\Traits\HasStatusToggle;
 use App\Models\Customer;
 use App\Services\CustomerService;
-use App\Validator\CustomerValidator;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 
 class CustomerController extends Controller
 {
@@ -33,23 +33,34 @@ class CustomerController extends Controller
         $perPage = $request->get('per_page', 15);
         $customers = $this->customerService->getPaginated($filters, $perPage);
 
-        return ApiResponse::paginated($customers);
+        return (new CustomerCollection($customers))
+            ->additional([
+                'meta' => [
+                    'current_page' => $customers->currentPage(),
+                    'from' => $customers->firstItem(),
+                    'last_page' => $customers->lastPage(),
+                    'per_page' => $customers->perPage(),
+                    'to' => $customers->lastItem(),
+                    'total' => $customers->total(),
+                ],
+                'links' => [
+                    'first' => $customers->url(1),
+                    'last' => $customers->url($customers->lastPage()),
+                    'prev' => $customers->previousPageUrl(),
+                    'next' => $customers->nextPageUrl(),
+                ],
+            ]);
     }
 
-    public function store(Request $request)
+    public function store(StoreCustomerRequest $request)
     {
-        $validator = Validator::make($request->all(), CustomerValidator::onCreate(), CustomerValidator::messages());
-        $data = $validator->validate();
-        $data = DataNormalizer::normalizeCustomer($data);
+        $data = $request->validated();
+        $customer = $this->customerService->create($data, $request->user()->id);
 
-        try {
-            $customer = $this->customerService->create($data, $request->user()->id);
-
-            return ApiResponse::success($customer, 'Customer created successfully', 201);
-        } catch (\Exception $e) {
-            report($e);
-            throw new \Exception("Unable to create customer");
-        }
+        return (new CustomerResource($customer))
+            ->additional(['message' => 'Customer created successfully'])
+            ->response()
+            ->setStatusCode(201);
     }
 
     public function show(Customer $customer)
@@ -60,42 +71,34 @@ class CustomerController extends Controller
             return ApiResponse::notFound('Customer not found');
         }
 
-        return ApiResponse::success($customer);
+        return new CustomerResource($customer);
     }
 
-    public function update(Request $request, Customer $customer)
+    public function update(UpdateCustomerRequest $request, Customer $customer)
     {
-        $validator = Validator::make($request->all(), CustomerValidator::onUpdate($customer->id), CustomerValidator::messages());
-        $data = $validator->validate();
-        $data = DataNormalizer::normalizeCustomer($data, $customer->id);
+        $data = $request->validated();
+        $customer = $this->customerService->update($customer, $data, $request->user()->id);
 
-        try {
-            $customer = $this->customerService->update($customer, $data, $request->user()->id);
-
-            return ApiResponse::success($customer, 'Customer updated successfully');
-        } catch (\Exception $e) {
-            report($e);
-            throw new \Exception("Unable to update customer");
-        }
+        return (new CustomerResource($customer))
+            ->additional(['message' => 'Customer updated successfully']);
     }
 
     public function destroy(Customer $customer)
     {
-        try {
-            $this->customerService->delete($customer);
+        $this->customerService->delete($customer);
 
-            return ApiResponse::success(null, 'Customer deleted successfully');
-        } catch (\Exception $e) {
-            report($e);
-            throw new \Exception("Unable to delete customer");
-        }
+        return response()->json([
+            'success' => true,
+            'message' => 'Customer deleted successfully',
+        ]);
     }
 
     public function toggleStatus(Request $request, Customer $customer)
     {
         $customer = $this->toggleModelStatus($customer, $this->customerService, $request->user()->id);
 
-        return ApiResponse::success($customer, 'Customer status updated successfully');
+        return (new CustomerResource($customer))
+            ->additional(['message' => 'Customer status updated successfully']);
     }
 
 }

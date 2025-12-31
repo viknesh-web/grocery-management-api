@@ -2,7 +2,8 @@
 
 namespace App\Http\Controllers\API;
 
-use App\Exceptions\MessageException;
+use App\Exceptions\BusinessException;
+use App\Exceptions\ValidationException;
 use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
@@ -187,6 +188,9 @@ class WhatsAppController extends Controller
             );
         }
 
+        // Check if async sending is requested (default: true)
+        $async = $request->boolean('async', true);
+
         $results = $this->whatsAppService->sendPriceListToCustomers(
             $customerIds,
             $message,
@@ -195,9 +199,20 @@ class WhatsAppController extends Controller
             $templateId,
             $contentVariables,
             $customPdfUrl,
-            $pdfLayout
+            $pdfLayout,
+            $async // Pass async flag
         );
 
+        // Handle async response
+        if (isset($results['status']) && $results['status'] === 'queued') {
+            return ApiResponse::success([
+                'queued' => true,
+                'customer_count' => $results['customer_count'],
+                'message' => $results['message'],
+            ], $results['message']);
+        }
+
+        // Handle synchronous response (existing code)
         $successCount = collect($results)->where('success', true)->count();
         $failureCount = count($results) - $successCount;
 
@@ -262,6 +277,9 @@ class WhatsAppController extends Controller
             }
         }
 
+        // Check if async sending is requested (default: true)
+        $async = $request->boolean('async', true);
+
         // Send to all active customers
         $results = $this->whatsAppService->sendPriceListToCustomers(
             null, // null means all active customers
@@ -269,9 +287,22 @@ class WhatsAppController extends Controller
             $includePdf,
             $productIds,
             $templateId,
-            $contentVariables
+            $contentVariables,
+            null, // customPdfUrl
+            'regular', // pdfLayout
+            $async // Pass async flag
         );
 
+        // Handle async response
+        if (isset($results['status']) && $results['status'] === 'queued') {
+            return ApiResponse::success([
+                'queued' => true,
+                'customer_count' => $results['customer_count'],
+                'message' => $results['message'],
+            ], $results['message']);
+        }
+
+        // Handle synchronous response (existing code)
         $successCount = collect($results)->where('success', true)->count();
         $failureCount = count($results) - $successCount;
 
@@ -312,27 +343,37 @@ class WhatsAppController extends Controller
      *
      * @param UploadedFile $file
      * @return string PDF URL
-     * @throws MessageException
+     * @throws ValidationException
+     * @throws BusinessException
      */
     private function uploadCustomPdf(UploadedFile $file): string
     {
         // Validate file size (max 10MB)
         $maxSize = 10 * 1024 * 1024; // 10MB in bytes
         if ($file->getSize() > $maxSize) {
-            throw new MessageException('PDF file size exceeds maximum allowed size of 10MB');
+            throw new ValidationException(
+                'PDF file size exceeds maximum allowed size of 10MB',
+                ['file' => ['The PDF file must not exceed 10MB']]
+            );
         }
 
         // Validate MIME type
         $allowedMimeTypes = ['application/pdf'];
         $mimeType = $file->getMimeType();
         if (!in_array($mimeType, $allowedMimeTypes)) {
-            throw new MessageException('Invalid file type. Only PDF files are allowed.');
+            throw new ValidationException(
+                'Invalid file type. Only PDF files are allowed.',
+                ['file' => ['Only PDF files are allowed']]
+            );
         }
 
         // Validate file extension
         $extension = strtolower($file->getClientOriginalExtension());
         if ($extension !== 'pdf') {
-            throw new MessageException('Invalid file extension. Only PDF files are allowed.');
+            throw new ValidationException(
+                'Invalid file extension. Only PDF files are allowed.',
+                ['file' => ['Only PDF files are allowed']]
+            );
         }
 
         // Get original filename and sanitize it
@@ -399,12 +440,12 @@ class WhatsAppController extends Controller
             $stored = $disk->putFileAs('pdfs', $file, $filename);
             
             if (!$stored) {
-                throw new MessageException('Failed to store custom PDF file');
+                throw new BusinessException('Failed to store PDF file. Please try again.');
             }
             
             // Verify file was stored and is readable
             if (!$disk->exists($path)) {
-                throw new MessageException('Failed to verify custom PDF file storage');
+                throw new BusinessException('Failed to verify PDF file storage. Please try again.');
             }
             
             // Get the URL using PdfService (uses media disk)
@@ -412,7 +453,7 @@ class WhatsAppController extends Controller
             
             // Ensure URL has no surrounding whitespace and encode spaces
             if (empty($pdfUrl)) {
-                throw new MessageException('Failed to generate PDF URL');
+                throw new BusinessException('Failed to generate PDF URL. Please try again.');
             }
             
             $pdfUrl = trim($pdfUrl);
@@ -432,7 +473,7 @@ class WhatsAppController extends Controller
                 'filename' => $filename,
             ]);
             
-            throw new MessageException('Failed to upload PDF file: ' . (config('app.debug') ? $e->getMessage() : 'Please try again later.'));
+            throw new BusinessException('Failed to upload PDF file. Please try again.');
         }
     }
 

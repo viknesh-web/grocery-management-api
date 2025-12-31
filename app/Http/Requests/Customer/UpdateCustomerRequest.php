@@ -62,8 +62,9 @@ class UpdateCustomerRequest extends FormRequest
             $dataToMerge['remarks'] = trim((string) $this->remarks);
         }
 
-        if ($this->has('active')) {
-            $dataToMerge['active'] = $this->boolean('active');
+        // Normalize status (no default for updates)
+        if ($this->has('status') && in_array($this->status, ['active', 'inactive'])) {
+            $dataToMerge['status'] = $this->status;
         }
 
         if (!empty($dataToMerge)) {
