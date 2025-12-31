@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
@@ -28,6 +27,12 @@ class Product extends Model
         'product_type',
         'created_by',
         'updated_by',
+    ];
+
+    protected $hidden = [
+        'created_by',
+        'updated_by',
+        'deleted_at',
     ];
 
     protected $casts = [

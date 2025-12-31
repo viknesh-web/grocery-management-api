@@ -6,9 +6,6 @@ use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Category\StoreCategoryRequest;
 use App\Http\Requests\Category\UpdateCategoryRequest;
-use App\Http\Resources\CategoryCollection;
-use App\Http\Resources\CategoryResource;
-use App\Http\Resources\ProductCollection;
 use App\Http\Traits\HasImageUpload;
 use App\Http\Traits\HasStatusToggle;
 use App\Services\CategoryService;
@@ -36,23 +33,7 @@ class CategoryController extends Controller
         $perPage = $request->get('per_page', 15);
         $categories = $this->categoryService->getPaginated($filters, $perPage);
 
-        return (new CategoryCollection($categories))
-            ->additional([
-                'meta' => [
-                    'current_page' => $categories->currentPage(),
-                    'from' => $categories->firstItem(),
-                    'last_page' => $categories->lastPage(),
-                    'per_page' => $categories->perPage(),
-                    'to' => $categories->lastItem(),
-                    'total' => $categories->total(),
-                ],
-                'links' => [
-                    'first' => $categories->url(1),
-                    'last' => $categories->url($categories->lastPage()),
-                    'prev' => $categories->previousPageUrl(),
-                    'next' => $categories->nextPageUrl(),
-                ],
-            ]);
+        return ApiResponse::paginated($categories);
     }
 
     public function store(StoreCategoryRequest $request)
@@ -60,10 +41,7 @@ class CategoryController extends Controller
         $data = $request->validated();
         $category = $this->categoryService->create($data, $request->file('image'), $request->user()->id);
         
-        return (new CategoryResource($category))
-            ->additional(['message' => 'Category created successfully'])
-            ->response()
-            ->setStatusCode(201);
+        return ApiResponse::success($category->toArray(), 'Category created successfully', 201);
     }
 
     public function show(Request $request)
@@ -71,7 +49,7 @@ class CategoryController extends Controller
         $category = $request->get('category');
         $category->load(['creator', 'updater', 'parent']);
         
-        return new CategoryResource($category);
+        return ApiResponse::success($category->toArray());
     }
 
     public function update(UpdateCategoryRequest $request)
@@ -80,8 +58,7 @@ class CategoryController extends Controller
         $data = $request->validated();
         $category = $this->categoryService->update($category, $data, $request->file('image'), $request->boolean('image_removed', false), $request->user()->id);
         
-        return (new CategoryResource($category))
-            ->additional(['message' => 'Category updated successfully']);
+        return ApiResponse::success($category->toArray(), 'Category updated successfully');
     }
 
     public function destroy(Request $request)
@@ -100,8 +77,7 @@ class CategoryController extends Controller
         $category = $request->get('category');
         $category = $this->toggleModelStatus($category, $this->categoryService, $request->user()->id);
         
-        return (new CategoryResource($category))
-            ->additional(['message' => 'Category status updated successfully']);
+        return ApiResponse::success($category->toArray(), 'Category status updated successfully');
     }
 
     public function reorder(Request $request)
@@ -118,20 +94,14 @@ class CategoryController extends Controller
     {
         $categories = $this->categoryService->search($query);
 
-        return response()->json([
-            'success' => true,
-            'data' => CategoryResource::collection($categories),
-        ]);
+        return ApiResponse::success($categories->map(fn($category) => $category->toArray())->toArray());
     }
 
     public function tree(Request $request)
     {
         $categories = $this->categoryService->getTree();
         
-        return response()->json([
-            'success' => true,
-            'data' => CategoryResource::collection($categories),
-        ]);
+        return ApiResponse::success($categories->map(fn($category) => $category->toArray())->toArray());
     }
 
     public function products(Request $request)
@@ -147,22 +117,6 @@ class CategoryController extends Controller
         $perPage = $request->get('per_page', 15);
         $products = $this->categoryService->getProducts($category, $filters, $perPage);
 
-        return (new ProductCollection($products))
-            ->additional([
-                'meta' => [
-                    'current_page' => $products->currentPage(),
-                    'from' => $products->firstItem(),
-                    'last_page' => $products->lastPage(),
-                    'per_page' => $products->perPage(),
-                    'to' => $products->lastItem(),
-                    'total' => $products->total(),
-                ],
-                'links' => [
-                    'first' => $products->url(1),
-                    'last' => $products->url($products->lastPage()),
-                    'prev' => $products->previousPageUrl(),
-                    'next' => $products->nextPageUrl(),
-                ],
-            ]);
+        return ApiResponse::paginated($products);
     }
 }

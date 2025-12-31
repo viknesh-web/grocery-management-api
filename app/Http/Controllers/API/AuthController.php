@@ -4,7 +4,6 @@ namespace App\Http\Controllers\API;
 
 use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
-use App\Http\Resources\UserResource;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -41,7 +40,7 @@ class AuthController extends Controller
             'success' => true,
             'message' => 'User registered successfully',
             'data' => [
-                'user' => new UserResource($user),
+                'user' => $user->toArray(),
                 'token' => $token,
                 'token_type' => 'Bearer',
             ],
@@ -72,7 +71,7 @@ class AuthController extends Controller
             'success' => true,
             'message' => 'Login successful',
             'data' => [
-                'user' => new UserResource($user),
+                'user' => $user->toArray(),
                 'token' => $token,
                 'token_type' => 'Bearer',
             ],
@@ -87,7 +86,7 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'user' => new UserResource($request->user()),
+                'user' => $request->user()->toArray(),
             ],
         ]);
     }
@@ -113,7 +112,7 @@ class AuthController extends Controller
             'success' => true,
             'message' => 'Profile updated successfully',
             'data' => [
-                'user' => new UserResource($user),
+                'user' => $user->toArray(),
             ],
         ]);
     }

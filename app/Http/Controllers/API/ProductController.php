@@ -6,8 +6,6 @@ use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Product\StoreProductRequest;
 use App\Http\Requests\Product\UpdateProductRequest;
-use App\Http\Resources\ProductCollection;
-use App\Http\Resources\ProductResource;
 use App\Http\Traits\HasImageUpload;
 use App\Http\Traits\HasStatusToggle;
 use App\Services\ProductService;
@@ -53,29 +51,7 @@ class ProductController extends Controller
         $perPage = $request->get('per_page', 15);
         $products = $this->productService->getPaginated($filters, $perPage);
         
-        $filtersApplied = property_exists($products, 'filters_applied') ? $products->filters_applied : [];
-        $totalFiltered = property_exists($products, 'total_filtered') ? $products->total_filtered : $products->total();
-        
-        return (new ProductCollection($products, $filtersApplied, $totalFiltered))
-            ->additional([
-                'meta' => array_merge([
-                    'current_page' => $products->currentPage(),
-                    'from' => $products->firstItem(),
-                    'last_page' => $products->lastPage(),
-                    'per_page' => $products->perPage(),
-                    'to' => $products->lastItem(),
-                    'total' => $products->total(),
-                ], [
-                    'filters_applied' => $filtersApplied,
-                    'total_filtered' => $totalFiltered,
-                ]),
-                'links' => [
-                    'first' => $products->url(1),
-                    'last' => $products->url($products->lastPage()),
-                    'prev' => $products->previousPageUrl(),
-                    'next' => $products->nextPageUrl(),
-                ],
-            ]);
+        return ApiResponse::paginated($products);
     }
 
     public function store(StoreProductRequest $request)
@@ -83,10 +59,7 @@ class ProductController extends Controller
         $data = $request->validated();
         $product = $this->productService->create($data, $request->file('image'), $request->user()->id);
         
-        return (new ProductResource($product))
-            ->additional(['message' => 'Product created successfully'])
-            ->response()
-            ->setStatusCode(201);
+        return ApiResponse::success($product->toArray(), 'Product created successfully', 201);
     }
 
     public function show(Request $request)
@@ -94,7 +67,7 @@ class ProductController extends Controller
         $product = $request->get('product');
         $product->load(['creator', 'updater', 'category']);
         
-        return new ProductResource($product);
+        return ApiResponse::success($product->toArray());
     }
 
     public function update(UpdateProductRequest $request)
@@ -103,8 +76,7 @@ class ProductController extends Controller
         $data = $request->validated();
         $product = $this->productService->update($product, $data, $request->file('image'), $request->boolean('image_removed', false), $request->user()->id);
         
-        return (new ProductResource($product))
-            ->additional(['message' => 'Product updated successfully']);
+        return ApiResponse::success($product->toArray(), 'Product updated successfully');
     }
 
     public function destroy(Request $request)
@@ -123,8 +95,7 @@ class ProductController extends Controller
         $product = $request->get('product');
         $product = $this->toggleModelStatus($product, $this->productService, $request->user()->id);
         
-        return (new ProductResource($product))
-            ->additional(['message' => 'Product status updated successfully']);
+        return ApiResponse::success($product->toArray(), 'Product status updated successfully');
     }
 
 }

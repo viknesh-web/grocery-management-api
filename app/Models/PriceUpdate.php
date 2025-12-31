@@ -37,6 +37,10 @@ class PriceUpdate extends Model
         'new_selling_price' => 'decimal:2',
     ];
 
+    protected $hidden = [
+        'updated_by',
+    ];
+
     protected $appends = ['price_change_percentage'];
 
     public function product(): BelongsTo

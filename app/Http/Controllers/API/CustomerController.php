@@ -6,8 +6,6 @@ use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Customer\StoreCustomerRequest;
 use App\Http\Requests\Customer\UpdateCustomerRequest;
-use App\Http\Resources\CustomerCollection;
-use App\Http\Resources\CustomerResource;
 use App\Http\Traits\HasStatusToggle;
 use App\Models\Customer;
 use App\Services\CustomerService;
@@ -33,23 +31,7 @@ class CustomerController extends Controller
         $perPage = $request->get('per_page', 15);
         $customers = $this->customerService->getPaginated($filters, $perPage);
 
-        return (new CustomerCollection($customers))
-            ->additional([
-                'meta' => [
-                    'current_page' => $customers->currentPage(),
-                    'from' => $customers->firstItem(),
-                    'last_page' => $customers->lastPage(),
-                    'per_page' => $customers->perPage(),
-                    'to' => $customers->lastItem(),
-                    'total' => $customers->total(),
-                ],
-                'links' => [
-                    'first' => $customers->url(1),
-                    'last' => $customers->url($customers->lastPage()),
-                    'prev' => $customers->previousPageUrl(),
-                    'next' => $customers->nextPageUrl(),
-                ],
-            ]);
+        return ApiResponse::paginated($customers);
     }
 
     public function store(StoreCustomerRequest $request)
@@ -57,10 +39,7 @@ class CustomerController extends Controller
         $data = $request->validated();
         $customer = $this->customerService->create($data, $request->user()->id);
 
-        return (new CustomerResource($customer))
-            ->additional(['message' => 'Customer created successfully'])
-            ->response()
-            ->setStatusCode(201);
+        return ApiResponse::success($customer->toArray(), 'Customer created successfully', 201);
     }
 
     public function show(Customer $customer)
@@ -71,7 +50,7 @@ class CustomerController extends Controller
             return ApiResponse::notFound('Customer not found');
         }
 
-        return new CustomerResource($customer);
+        return ApiResponse::success($customer->toArray());
     }
 
     public function update(UpdateCustomerRequest $request, Customer $customer)
@@ -79,8 +58,7 @@ class CustomerController extends Controller
         $data = $request->validated();
         $customer = $this->customerService->update($customer, $data, $request->user()->id);
 
-        return (new CustomerResource($customer))
-            ->additional(['message' => 'Customer updated successfully']);
+        return ApiResponse::success($customer->toArray(), 'Customer updated successfully');
     }
 
     public function destroy(Customer $customer)
@@ -97,8 +75,7 @@ class CustomerController extends Controller
     {
         $customer = $this->toggleModelStatus($customer, $this->customerService, $request->user()->id);
 
-        return (new CustomerResource($customer))
-            ->additional(['message' => 'Customer status updated successfully']);
+        return ApiResponse::success($customer->toArray(), 'Customer status updated successfully');
     }
 
 }
