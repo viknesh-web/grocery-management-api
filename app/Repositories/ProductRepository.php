@@ -3,21 +3,18 @@
 namespace App\Repositories;
 
 use App\Models\Product;
-use App\Repositories\Contracts\ProductRepositoryInterface;
-use App\Services\ProductFilterService;
+use App\Services\CacheService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Product Repository
  * 
  * Handles all database operations for products.
  */
-class ProductRepository implements ProductRepositoryInterface
+class ProductRepository
 {
-    public function __construct(
-        private ProductFilterService $filterService
-    ) {}
 
     /**
      * Get all products with optional filters and relations.
@@ -28,16 +25,11 @@ class ProductRepository implements ProductRepositoryInterface
      */
     public function all(array $filters = [], array $relations = []): Collection
     {
-        $query = Product::query();
-
-        if (!empty($relations)) {
-            $query->with($relations);
-        }
-
-        $query = $this->applyFilters($query, $filters);
-        $query = $this->applySorting($query, $filters);
-
-        return $query->get();
+        $cacheKey = CacheService::productListKey($filters);
+        
+        return Cache::remember($cacheKey, CacheService::TTL_MEDIUM, function () use ($filters, $relations) {
+            return $this->buildQuery($filters, $relations)->get();
+        });
     }
 
     /**
@@ -50,69 +42,27 @@ class ProductRepository implements ProductRepositoryInterface
      */
     public function paginate(array $filters = [], int $perPage = 15, array $relations = []): LengthAwarePaginator
     {
-        $query = Product::query();
-
-        if (!empty($relations)) {
-            $query->with($relations);
-        }
-
-        $query = $this->applyFilters($query, $filters);
-        $query = $this->applySorting($query, $filters);
-
-        return $query->paginate($perPage);
+        return $this->buildQuery($filters, $relations)->paginate($perPage);
     }
 
     /**
-     * Find a product by ID with optional relations.
+     * Build query with common logic for filtering, sorting, and relations.
      *
-     * @param int $id
+     * @param array $filters
      * @param array $relations
-     * @return Product|null
+     * @return \Illuminate\Database\Eloquent\Builder
      */
-    public function find(int $id, array $relations = []): ?Product
+    private function buildQuery(array $filters = [], array $relations = [])
     {
-        $query = Product::query();
-
-        if (!empty($relations)) {
-            $query->with($relations);
-        }
-
-        return $query->find($id);
+        return Product::query()
+            ->filter($filters) // Use model scope!
+            ->when(!empty($relations), fn($q) => $q->with($relations))
+            ->sortBy(
+                $filters['sort_by'] ?? 'created_at',
+                $filters['sort_order'] ?? 'desc'
+            ); // Use model scope!
     }
 
-    /**
-     * Create a new product.
-     *
-     * @param array $data
-     * @return Product
-     */
-    public function create(array $data): Product
-    {
-        return Product::create($data);
-    }
-
-    /**
-     * Update a product.
-     *
-     * @param Product $product
-     * @param array $data
-     * @return bool
-     */
-    public function update(Product $product, array $data): bool
-    {
-        return $product->update($data);
-    }
-
-    /**
-     * Delete a product.
-     *
-     * @param Product $product
-     * @return bool
-     */
-    public function delete(Product $product): bool
-    {
-        return $product->delete();
-    }
 
     /**
      * Search products by query string.
@@ -123,13 +73,9 @@ class ProductRepository implements ProductRepositoryInterface
      */
     public function search(string $query, array $relations = []): Collection
     {
-        $builder = Product::query();
-
-        if (!empty($relations)) {
-            $builder->with($relations);
-        }
-
-        return $builder->search($query)->get();
+        return Product::search($query) // Use scope!
+            ->when(!empty($relations), fn($q) => $q->with($relations))
+            ->get();
     }
 
     /**
@@ -140,13 +86,13 @@ class ProductRepository implements ProductRepositoryInterface
      */
     public function getEnabled(array $relations = []): Collection
     {
-        $query = Product::enabled();
-
-        if (!empty($relations)) {
-            $query->with($relations);
-        }
-
-        return $query->get();
+        $cacheKey = CacheService::productListKey(['status' => 'active']);
+        
+        return Cache::remember($cacheKey, CacheService::TTL_LONG, function () use ($relations) {
+            return Product::active() // Use scope!
+                ->when(!empty($relations), fn($q) => $q->with($relations))
+                ->get();
+        });
     }
 
     /**
@@ -160,44 +106,19 @@ class ProductRepository implements ProductRepositoryInterface
      */
     public function getByCategory(int $categoryId, array $filters = [], int $perPage = 15, array $relations = []): LengthAwarePaginator
     {
-        $query = Product::where('category_id', $categoryId);
+        // Set category_id in filters to use the filter scope
+        $filters['category_id'] = $categoryId;
 
-        if (!empty($relations)) {
-            $query->with($relations);
-        }
-
-        $query = $this->applyFilters($query, $filters);
-        $query = $this->applySorting($query, $filters);
-
-        return $query->paginate($perPage);
+        return Product::query()
+            ->filter($filters) // Use scope!
+            ->when(!empty($relations), fn($q) => $q->with($relations))
+            ->sortBy(
+                $filters['sort_by'] ?? 'created_at',
+                $filters['sort_order'] ?? 'desc'
+            ) // Use scope!
+            ->paginate($perPage);
     }
 
-    /**
-     * Apply filters to query.
-     *
-     * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param array $filters
-     * @return \Illuminate\Database\Eloquent\Builder
-     */
-    private function applyFilters($query, array $filters)
-    {
-        return $this->filterService->applyFilters($query, $filters);
-    }
-
-    /**
-     * Apply sorting to query.
-     *
-     * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param array $filters
-     * @return \Illuminate\Database\Eloquent\Builder
-     */
-    private function applySorting($query, array $filters)
-    {
-        $sortBy = $filters['sort_by'] ?? 'created_at';
-        $sortOrder = $filters['sort_order'] ?? 'desc';
-        
-        return $this->filterService->applySorting($query, $sortBy, $sortOrder);
-    }
 }
 
 

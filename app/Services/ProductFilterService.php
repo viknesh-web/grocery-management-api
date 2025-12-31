@@ -35,60 +35,14 @@ class ProductFilterService
             $query->where('status', $filters['status']);
         }
 
+        // Discount filter - uses Product model scopes for date-range logic
         if (isset($filters['has_discount'])) {
-            $hasDiscount = (bool) $filters['has_discount'];
-            $today = now()->toDateString();
-
+            $hasDiscount = filter_var($filters['has_discount'], FILTER_VALIDATE_BOOLEAN);
+            
             if ($hasDiscount) {
-                $query->where('discount_type', '!=', 'none')
-                    ->whereNotNull('discount_value')
-                    ->where('discount_value', '>', 0)
-                    ->where(function ($q) use ($today) {
-                        $q->where(function ($q2) {
-                            // No date range configured - always active
-                            $q2->whereNull('discount_start_date')
-                                ->whereNull('discount_end_date');
-                        })->orWhere(function ($q2) use ($today) {
-                            // Start only
-                            $q2->whereNotNull('discount_start_date')
-                                ->whereNull('discount_end_date')
-                                ->where('discount_start_date', '<=', $today);
-                        })->orWhere(function ($q2) use ($today) {
-                            // End only
-                            $q2->whereNull('discount_start_date')
-                                ->whereNotNull('discount_end_date')
-                                ->where('discount_end_date', '>=', $today);
-                        })->orWhere(function ($q2) use ($today) {
-                            // Start and end
-                            $q2->whereNotNull('discount_start_date')
-                                ->whereNotNull('discount_end_date')
-                                ->where('discount_start_date', '<=', $today)
-                                ->where('discount_end_date', '>=', $today);
-                        });
-                    });
+                $query->withActiveDiscount();
             } else {
-                $query->where(function ($q) use ($today) {
-                    $q->where('discount_type', 'none')
-                        ->orWhereNull('discount_value')
-                        ->orWhere('discount_value', '<=', 0)
-                        // Or discount exists but is outside the active date range
-                        ->orWhere(function ($q2) use ($today) {
-                            $q2->where('discount_type', '!=', 'none')
-                                ->whereNotNull('discount_value')
-                                ->where('discount_value', '>', 0)
-                                ->where(function ($q3) use ($today) {
-                                    $q3->where(function ($qq) use ($today) {
-                                        // Starts in future
-                                        $qq->whereNotNull('discount_start_date')
-                                            ->where('discount_start_date', '>', $today);
-                                    })->orWhere(function ($qq) use ($today) {
-                                        // Ended in past
-                                        $qq->whereNotNull('discount_end_date')
-                                            ->where('discount_end_date', '<', $today);
-                                    });
-                                });
-                        });
-                });
+                $query->withoutActiveDiscount();
             }
         }
 

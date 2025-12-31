@@ -2,11 +2,13 @@
 
 namespace App\Services;
 
+use App\Exceptions\ValidationException;
 use App\Models\Category;
 use App\Repositories\CategoryRepository;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Category Service
@@ -41,8 +43,7 @@ class CategoryService
      */
     public function find(int $id): ?Category
     {
-        $relations = [];
-        return $this->repository->find($id, $relations);
+        return Category::find($id);
     }
 
     /**
@@ -62,9 +63,13 @@ class CategoryService
                 $data['image'] = $this->imageService->uploadCategoryImage($image);
             }
 
-            $category = $this->repository->create($data);
+            $category = Category::create($data);
 
             DB::commit();
+
+            // Clear category cache after creation
+            \App\Services\CacheService::clearCategoryCache();
+
             return $category;
         } catch (\Exception $e) {
             DB::rollBack();
@@ -100,10 +105,14 @@ class CategoryService
                 $data['image'] = null;
             }
 
-            $this->repository->update($category, $data);
+            $category->update($data);
             $category->refresh();
 
             DB::commit();
+
+            // Clear specific category and list caches
+            \App\Services\CacheService::clearCategory($category->id);
+
             return $category;
         } catch (\Exception $e) {
             DB::rollBack();
@@ -122,8 +131,19 @@ class CategoryService
     {
         // Check if category has products
         if ($this->repository->hasProducts($category)) {
-            throw new \Exception('Cannot delete category with existing products. Please reassign or delete products first.');
+            $productCount = $category->products()->count();
+            throw new ValidationException(
+                message: 'Cannot delete category with existing products',
+                errors: [
+                    'category_id' => [
+                        "This category has {$productCount} products. " .
+                        'Please reassign or delete products first.'
+                    ]
+                ]
+            );
         }
+
+        $categoryId = $category->id;
 
         DB::beginTransaction();
         try {
@@ -132,9 +152,13 @@ class CategoryService
                 $this->imageService->deleteCategoryImage($category->image);
             }
 
-            $result = $this->repository->delete($category);
+            $result = $category->delete();
 
             DB::commit();
+
+            // Clear category cache
+            \App\Services\CacheService::clearCategory($categoryId);
+
             return $result;
         } catch (\Exception $e) {
             DB::rollBack();
@@ -152,7 +176,7 @@ class CategoryService
     public function toggleStatus(Category $category, int $userId): Category
     {
         $newStatus = $category->status === 'active' ? 'inactive' : 'active';
-        $this->repository->update($category, [
+        $category->update([
             'status' => $newStatus,
         ]);
 

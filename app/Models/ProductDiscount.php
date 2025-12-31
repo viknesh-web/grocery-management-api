@@ -20,6 +20,10 @@ class ProductDiscount extends Model
         'status',
     ];
 
+    protected $hidden = [
+        'product_id',
+    ];
+
     protected $casts = [
         'discount_value' => 'decimal:2',
         'start_date' => 'date',
@@ -109,6 +113,7 @@ class ProductDiscount extends Model
             });
     }
 }
+
 
 
 

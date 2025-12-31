@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\API;
 
+use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -19,7 +20,7 @@ class AuthController extends Controller
     /**
      * Register a new admin user.
      */
-    public function register(Request $request): JsonResponse
+    public function register(Request $request)
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -36,13 +37,10 @@ class AuthController extends Controller
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
+            'success' => true,
             'message' => 'User registered successfully',
             'data' => [
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                ],
+                'user' => $user->toArray(),
                 'token' => $token,
                 'token_type' => 'Bearer',
             ],
@@ -52,7 +50,7 @@ class AuthController extends Controller
     /**
      * Login user and return token.
      */
-    public function login(Request $request): JsonResponse
+    public function login(Request $request)
     {
         $request->validate([
             'email' => ['required', 'email'],
@@ -70,39 +68,33 @@ class AuthController extends Controller
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
+            'success' => true,
             'message' => 'Login successful',
             'data' => [
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                ],
+                'user' => $user->toArray(),
                 'token' => $token,
                 'token_type' => 'Bearer',
             ],
-        ], 200);
+        ]);
     }
 
     /**
      * Get the authenticated user.
      */
-    public function user(Request $request): JsonResponse
+    public function user(Request $request)
     {
         return response()->json([
+            'success' => true,
             'data' => [
-                'user' => [
-                    'id' => $request->user()->id,
-                    'name' => $request->user()->name,
-                    'email' => $request->user()->email,
-                ],
+                'user' => $request->user()->toArray(),
             ],
-        ], 200);
+        ]);
     }
 
     /**
      * Update the authenticated user's profile.
      */
-    public function updateProfile(Request $request): JsonResponse
+    public function updateProfile(Request $request)
     {
         $user = $request->user();
 
@@ -117,27 +109,22 @@ class AuthController extends Controller
         ]);
 
         return response()->json([
+            'success' => true,
             'message' => 'Profile updated successfully',
             'data' => [
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                ],
+                'user' => $user->toArray(),
             ],
-        ], 200);
+        ]);
     }
 
     /**
      * Logout the authenticated user.
      */
-    public function logout(Request $request): JsonResponse
+    public function logout(Request $request)
     {
         $request->user()->currentAccessToken()->delete();
 
-        return response()->json([
-            'message' => 'Logged out successfully',
-        ], 200);
+        return ApiResponse::success(null, 'Logged out successfully');
     }
 }
 

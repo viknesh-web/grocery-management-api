@@ -3,16 +3,17 @@
 namespace App\Repositories;
 
 use App\Models\Category;
-use App\Repositories\Contracts\CategoryRepositoryInterface;
+use App\Services\CacheService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Category Repository
  * 
  * Handles all database operations for categories.
  */
-class CategoryRepository implements CategoryRepositoryInterface
+class CategoryRepository
 {
     /**
      * Get all categories with optional filters and relations.
@@ -23,33 +24,11 @@ class CategoryRepository implements CategoryRepositoryInterface
      */
     public function all(array $filters = [], array $relations = []): Collection
     {
-        $query = Category::query();
-
-        // Apply relations
-        if (!empty($relations)) {
-            $query->with($relations);
-        }
-
-        // Apply filters
-        if (isset($filters['active'])) {
-            $status = filter_var($filters['active'], FILTER_VALIDATE_BOOLEAN) ? 'active' : 'inactive';
-            $query->where('status', $status);
-        }
-
-        if (isset($filters['status']) && in_array($filters['status'], ['active', 'inactive'])) {
-            $query->where('status', $filters['status']);
-        }
-
-        if (isset($filters['search'])) {
-            $query->search($filters['search']);
-        }
-
-        // Apply sorting
-        $sortBy = $filters['sort_by'] ?? 'name';
-        $sortOrder = $filters['sort_order'] ?? 'asc';
-        $query->orderBy($sortBy, $sortOrder);
-
-        return $query->get();
+        $cacheKey = CacheService::categoryListKey($filters);
+        
+        return Cache::remember($cacheKey, CacheService::TTL_LONG, function () use ($filters, $relations) {
+            return $this->query($filters, $relations)->get();
+        });
     }
 
     /**
@@ -62,33 +41,7 @@ class CategoryRepository implements CategoryRepositoryInterface
      */
     public function paginate(array $filters = [], int $perPage = 15, array $relations = []): LengthAwarePaginator
     {
-        $query = Category::query();
-
-        // Apply relations
-        if (!empty($relations)) {
-            $query->with($relations);
-        }
-
-        // Apply filters
-        if (isset($filters['active'])) {
-            $status = filter_var($filters['active'], FILTER_VALIDATE_BOOLEAN) ? 'active' : 'inactive';
-            $query->where('status', $status);
-        }
-
-        if (isset($filters['status']) && in_array($filters['status'], ['active', 'inactive'])) {
-            $query->where('status', $filters['status']);
-        }
-
-        if (isset($filters['search'])) {
-            $query->search($filters['search']);
-        }
-
-        // Apply sorting
-        $sortBy = $filters['sort_by'] ?? 'name';
-        $sortOrder = $filters['sort_order'] ?? 'asc';
-        $query->orderBy($sortBy, $sortOrder);
-
-        $categories = $query->paginate($perPage);
+        $categories = $this->query($filters, $relations)->paginate($perPage);
 
         // Add products count
         $categories->getCollection()->transform(function ($category) {
@@ -100,56 +53,25 @@ class CategoryRepository implements CategoryRepositoryInterface
     }
 
     /**
-     * Find a category by ID with optional relations.
+     * Build query with common logic for filtering, sorting, and relations.
      *
-     * @param int $id
+     * @param array $filters
      * @param array $relations
-     * @return Category|null
+     * @return \Illuminate\Database\Eloquent\Builder
      */
-    public function find(int $id, array $relations = []): ?Category
+    private function query(array $filters = [], array $relations = [])
     {
-        $query = Category::query();
-
-        if (!empty($relations)) {
-            $query->with($relations);
+        // Handle legacy 'active' filter
+        if (isset($filters['active']) && !isset($filters['status'])) {
+            $filters['status'] = filter_var($filters['active'], FILTER_VALIDATE_BOOLEAN) ? 'active' : 'inactive';
         }
 
-        return $query->find($id);
+        return Category::query()
+            ->filter($filters) // Use scope!
+            ->when(!empty($relations), fn($q) => $q->with($relations))
+            ->ordered(); // Use scope!
     }
 
-    /**
-     * Create a new category.
-     *
-     * @param array $data
-     * @return Category
-     */
-    public function create(array $data): Category
-    {
-        return Category::create($data);
-    }
-
-    /**
-     * Update a category.
-     *
-     * @param Category $category
-     * @param array $data
-     * @return bool
-     */
-    public function update(Category $category, array $data): bool
-    {
-        return $category->update($data);
-    }
-
-    /**
-     * Delete a category.
-     *
-     * @param Category $category
-     * @return bool
-     */
-    public function delete(Category $category): bool
-    {
-        return $category->delete();
-    }
 
     /**
      * Search categories by query string.
@@ -160,21 +82,11 @@ class CategoryRepository implements CategoryRepositoryInterface
      */
     public function search(string $query, array $relations = []): Collection
     {
-        $builder = Category::query();
-        $builder->where('name', 'like', "%{$query}%");
-
-        if (!empty($relations)) {
-            $builder->with($relations);
-        }
-
-        $categories = $builder->orderBy('name', 'asc')->get();
-
-        $categories->transform(function ($category) {
-            $category->products_count = $category->products()->count();
-            return $category;
-        });
-
-        return $categories;
+        return Category::search($query) // Use scope!
+            ->when(!empty($relations), fn($q) => $q->with($relations))
+            ->withProductCount() // Use scope!
+            ->ordered()
+            ->get();
     }
 
     /**
@@ -185,13 +97,10 @@ class CategoryRepository implements CategoryRepositoryInterface
      */
     public function getRootCategories(array $relations = []): Collection
     {
-        $query = Category::active()->orderBy('name', 'asc');
-
-        if (!empty($relations)) {
-            $query->with($relations);
-        }
-
-        return $query->get();
+        return Category::active() // Use scope!
+            ->when(!empty($relations), fn($q) => $q->with($relations))
+            ->ordered()
+            ->get();
     }
 
     /**
@@ -202,13 +111,14 @@ class CategoryRepository implements CategoryRepositoryInterface
      */
     public function getActiveCategories(array $relations = []): Collection
     {
-        $query = Category::active();
-
-        if (!empty($relations)) {
-            $query->with($relations);
-        }
-
-        return $query->get();
+        $cacheKey = CacheService::categoryListKey(['status' => 'active']);
+        
+        return Cache::remember($cacheKey, CacheService::TTL_DAY, function () use ($relations) {
+            return Category::active() // Use scope!
+                ->when(!empty($relations), fn($q) => $q->with($relations))
+                ->ordered()
+                ->get();
+        });
     }
 
     /**

@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Models\Customer;
-use App\Repositories\Contracts\CustomerRepositoryInterface;
+use App\Repositories\CustomerRepository;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\DB;
 class CustomerService
 {
     public function __construct(
-        private CustomerRepositoryInterface $repository
+        private CustomerRepository $repository
     ) {}
 
     /**
@@ -39,8 +39,7 @@ class CustomerService
      */
     public function find(int $id): ?Customer
     {
-        $relations = [];
-        return $this->repository->find($id, $relations);
+        return Customer::find($id);
     }
 
     /**
@@ -54,7 +53,7 @@ class CustomerService
     {
         DB::beginTransaction();
         try {
-            $customer = $this->repository->create($data);
+            $customer = Customer::create($data);
 
             DB::commit();
             return $customer;
@@ -76,7 +75,7 @@ class CustomerService
     {
         DB::beginTransaction();
         try {
-            $this->repository->update($customer, $data);
+            $customer->update($data);
             $customer->refresh();
 
             DB::commit();
@@ -97,7 +96,7 @@ class CustomerService
     {
         DB::beginTransaction();
         try {
-            $result = $this->repository->delete($customer);
+            $result = $customer->delete();
 
             DB::commit();
             return $result;
@@ -117,7 +116,7 @@ class CustomerService
     public function toggleStatus(Customer $customer, int $userId): Customer
     {
         $newStatus = $customer->status === 'active' ? 'inactive' : 'active';
-        $this->repository->update($customer, [
+        $customer->update([
             'status' => $newStatus,
         ]);
 

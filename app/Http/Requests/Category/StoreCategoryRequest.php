@@ -41,8 +41,9 @@ class StoreCategoryRequest extends FormRequest
             $dataToMerge['description'] = trim((string) $this->description);
         }
 
-        if ($this->has('is_active')) {
-            $dataToMerge['is_active'] = $this->boolean('is_active');
+        // Normalize status with default
+        if ($this->has('status') && in_array($this->status, ['active', 'inactive'])) {
+            $dataToMerge['status'] = $this->status;
         } else {
             $dataToMerge['status'] = 'active';
         }

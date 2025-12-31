@@ -3,7 +3,6 @@
 namespace App\Repositories;
 
 use App\Models\PriceUpdate;
-use App\Repositories\Contracts\PriceUpdateRepositoryInterface;
 use Illuminate\Database\Eloquent\Collection;
 
 /**
@@ -11,7 +10,7 @@ use Illuminate\Database\Eloquent\Collection;
  * 
  * Handles all database operations for price updates.
  */
-class PriceUpdateRepository implements PriceUpdateRepositoryInterface
+class PriceUpdateRepository
 {
     /**
      * Create a new price update record.

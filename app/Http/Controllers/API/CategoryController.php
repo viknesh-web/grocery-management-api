@@ -2,24 +2,24 @@
 
 namespace App\Http\Controllers\API;
 
-use App\Exceptions\MessageException;
-use App\Helper\DataNormalizer;
+use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
-use App\Http\Resources\Category\CategoryCollection;
-use App\Http\Resources\Product\ProductCollection;
+use App\Http\Requests\Category\StoreCategoryRequest;
+use App\Http\Requests\Category\UpdateCategoryRequest;
+use App\Http\Traits\HasImageUpload;
+use App\Http\Traits\HasStatusToggle;
 use App\Services\CategoryService;
-use App\Validator\CategoryValidator;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 
 class CategoryController extends Controller
 {
+    use HasImageUpload, HasStatusToggle;
+
     public function __construct(
         private CategoryService $categoryService
     ) {}
 
-    public function index(Request $request): CategoryCollection
+    public function index(Request $request)
     {
         $filters = [
             'active' => $request->get('active'),
@@ -33,136 +33,78 @@ class CategoryController extends Controller
         $perPage = $request->get('per_page', 15);
         $categories = $this->categoryService->getPaginated($filters, $perPage);
 
-        return new CategoryCollection($categories);
+        return ApiResponse::paginated($categories);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreCategoryRequest $request)
     {
-        if ($request->has('is_active')) {
-            $request->merge(['is_active' => $request->boolean('is_active')]);
-        }
+        $data = $request->validated();
+        $category = $this->categoryService->create($data, $request->file('image'), $request->user()->id);
         
-        $validator = Validator::make($request->all(), CategoryValidator::onCreate());
-        $data = $validator->validate();
-        $data = DataNormalizer::normalizeCategory($data);
-
-        try {
-            $category = $this->categoryService->create($data, $request->file('image'), $request->user()->id);
-            
-            $response = [
-                'message' => 'Category created successfully',
-                'data' => $category,
-            ];
-
-            return response()->json($response, 201);
-        } catch (\Exception $e) {
-            report($e);
-            throw new \Exception("Unable to create category");
-        }
+        return ApiResponse::success($category->toArray(), 'Category created successfully', 201);
     }
 
-    public function show(Request $request): JsonResponse
+    public function show(Request $request)
     {
         $category = $request->get('category');
         $category->load(['creator', 'updater', 'parent']);
         
+        return ApiResponse::success($category->toArray());
+    }
+
+    public function update(UpdateCategoryRequest $request)
+    {
+        $category = $request->get('category');
+        $data = $request->validated();
+        $category = $this->categoryService->update($category, $data, $request->file('image'), $request->boolean('image_removed', false), $request->user()->id);
+        
+        return ApiResponse::success($category->toArray(), 'Category updated successfully');
+    }
+
+    public function destroy(Request $request)
+    {
+        $category = $request->get('category');
+        $this->categoryService->delete($category);
+        
         return response()->json([
-            'data' => $category,
+            'success' => true,
+            'message' => 'Category deleted successfully',
         ]);
     }
 
-    public function update(Request $request): JsonResponse
+    public function toggleStatus(Request $request)
     {
         $category = $request->get('category');
+        $category = $this->toggleModelStatus($category, $this->categoryService, $request->user()->id);
         
-        if ($request->has('is_active')) {
-            $request->merge(['is_active' => $request->boolean('is_active')]);
-        }
-        
-        $validator = Validator::make($request->all(), CategoryValidator::onUpdate($category->id));
-        $data = $validator->validate();
-        $data = DataNormalizer::normalizeCategory($data, $category->id);
-
-        try {
-            $category = $this->categoryService->update($category, $data, $request->file('image'), $request->boolean('image_removed', false), $request->user()->id);
-            
-            $response = [
-                'message' => 'Category updated successfully',
-                'data' => $category,
-            ];
-
-            return response()->json($response);
-
-        } catch (\Exception $e) {
-            report($e);
-            throw new \Exception("Unable to update category");
-        }
+        return ApiResponse::success($category->toArray(), 'Category status updated successfully');
     }
 
-    public function destroy(Request $request): JsonResponse
-    {
-        $category = $request->get('category');
-
-        try {
-            $this->categoryService->delete($category);
-            
-            $response = [
-                'message' => 'Category deleted successfully',
-            ];
-
-            return response()->json($response);
-
-        } catch (\Exception $e) {
-            report($e);
-            throw new \Exception("Unable to delete category");
-        }
-    }
-
-    public function toggleStatus(Request $request): JsonResponse
-    {
-        $category = $request->get('category');
-        $category = $this->categoryService->toggleStatus($category, $request->user()->id);
-        
-        $response = [
-            'message' => 'Category status updated successfully',
-            'data' => $category,
-        ];
-
-        return response()->json($response);
-    }
-
-    public function reorder(Request $request): JsonResponse
+    public function reorder(Request $request)
     {
         // Display order is no longer supported in the schema
         // This endpoint is kept for API compatibility but does nothing
-        $response = [
-            'message' => 'Category reordering is no longer supported',
-        ];
-
-        return response()->json($response);
-    }
-
-    public function search(Request $request, string $query): JsonResponse
-    {
-        $categories = $this->categoryService->search($query);
-
         return response()->json([
-            'data' => $categories,
+            'success' => true,
+            'message' => 'Category reordering is no longer supported',
         ]);
     }
 
-    public function tree(Request $request): JsonResponse
+    public function search(Request $request, string $query)
+    {
+        $categories = $this->categoryService->search($query);
+
+        return ApiResponse::success($categories->map(fn($category) => $category->toArray())->toArray());
+    }
+
+    public function tree(Request $request)
     {
         $categories = $this->categoryService->getTree();
         
-        $response = [
-            'data' => $categories,
-        ];
-
-        return response()->json($response);
+        return ApiResponse::success($categories->map(fn($category) => $category->toArray())->toArray());
     }
 
-    public function products(Request $request): ProductCollection
+    public function products(Request $request)
     {
         $category = $request->get('category');
         $filters = [
@@ -175,6 +117,6 @@ class CategoryController extends Controller
         $perPage = $request->get('per_page', 15);
         $products = $this->categoryService->getProducts($category, $filters, $perPage);
 
-        return new ProductCollection($products);
+        return ApiResponse::paginated($products);
     }
 }

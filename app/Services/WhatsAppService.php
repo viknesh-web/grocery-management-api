@@ -2,6 +2,9 @@
 
 namespace App\Services;
 
+use App\Exceptions\ServiceException;
+use App\Exceptions\ValidationException;
+use App\Helpers\PhoneNumberHelper;
 use App\Models\Customer;
 use App\Services\PdfService;
 use Illuminate\Support\Facades\Log;
@@ -30,12 +33,10 @@ class WhatsAppService
         $this->whatsappNumber = $whatsappNumber;
     }
 
-    public function sendPriceListToCustomers(?array $customerIds = null, ?string $customMessage = null, bool $includePdf = true, ?array $productIds = null, ?string $templateId = null, ?array $contentVariables = null, ?string $customPdfUrl = null, string $pdfLayout = 'regular'): array
+    public function sendPriceListToCustomers(?array $customerIds = null, ?string $customMessage = null, bool $includePdf = true, ?array $productIds = null, ?string $templateId = null, ?array $contentVariables = null, ?string $customPdfUrl = null, string $pdfLayout = 'regular', bool $async = true): array
     {
-        $results = [];
-        $pdfUrl = null;
-        
         // Generate PDF if needed
+        $pdfUrl = null;
         if ($includePdf) {
             if ($customPdfUrl !== null) {
                 // Use custom uploaded PDF
@@ -47,19 +48,74 @@ class WhatsAppService
             }
         }
 
-        // If no customer IDs provided, send to all active customers
-        if ($customerIds === null || empty($customerIds)) {
-            $customers = Customer::where('active', true)->get();
-        } else {
-            $customers = Customer::whereIn('id', $customerIds)->get();
+        // If async, dispatch batch job
+        if ($async) {
+            \App\Jobs\WhatsAppMessageBatch::dispatch(
+                $customerIds,
+                $customMessage,
+                $pdfUrl,
+                $templateId,
+                $contentVariables
+            );
+
+            // Return immediate response
+            $customerCount = $customerIds 
+                ? count($customerIds) 
+                : Customer::where('status', 'active')->count();
+
+            return [
+                'status' => 'queued',
+                'message' => "Messages queued for {$customerCount} customer(s)",
+                'customer_count' => $customerCount,
+            ];
         }
 
-        foreach ($customers as $customer) {
-            $result = $this->sendMessage($customer, $customMessage, $pdfUrl, $templateId, $contentVariables);
-            $results[] = array_merge([
-                'customer_id' => $customer->id,
-                'customer_name' => $customer->name,
-            ], $result);
+        // Fallback to synchronous sending (existing code)
+        $results = [];
+        
+        // Process customers in chunks to avoid memory issues with large lists
+        if ($customerIds === null || empty($customerIds)) {
+            // Send to all active customers in chunks
+            Customer::where('status', 'active')
+                ->chunk(100, function ($customers) use (&$results, $customMessage, $pdfUrl, $templateId, $contentVariables) {
+                    foreach ($customers as $customer) {
+                        try {
+                            $result = $this->sendMessage($customer, $customMessage, $pdfUrl, $templateId, $contentVariables);
+                            $results[] = array_merge([
+                                'customer_id' => $customer->id,
+                                'customer_name' => $customer->name,
+                            ], $result);
+                        } catch (\Throwable $e) {
+                            $results[] = [
+                                'customer_id' => $customer->id,
+                                'customer_name' => $customer->name,
+                                'success' => false,
+                                'error' => $e->getMessage(),
+                            ];
+                        }
+                    }
+                });
+        } else {
+            // Process specific customer IDs in chunks
+            Customer::whereIn('id', $customerIds)
+                ->chunk(100, function ($customers) use (&$results, $customMessage, $pdfUrl, $templateId, $contentVariables) {
+                    foreach ($customers as $customer) {
+                        try {
+                            $result = $this->sendMessage($customer, $customMessage, $pdfUrl, $templateId, $contentVariables);
+                            $results[] = array_merge([
+                                'customer_id' => $customer->id,
+                                'customer_name' => $customer->name,
+                            ], $result);
+                        } catch (\Throwable $e) {
+                            $results[] = [
+                                'customer_id' => $customer->id,
+                                'customer_name' => $customer->name,
+                                'success' => false,
+                                'error' => $e->getMessage(),
+                            ];
+                        }
+                    }
+                });
         }
 
         return $results;
@@ -72,19 +128,13 @@ class WhatsAppService
             $fromNumber = $this->whatsappNumber;
 
             // Ensure customer WhatsApp number format is correct
-            $toNumber = $customer->whatsapp_number;
-            if (!str_starts_with($toNumber, 'whatsapp:')) {
-                // Remove any spaces or dashes, ensure it starts with +
-                $cleaned = preg_replace('/[^\d+]/', '', $toNumber);
-                if (!str_starts_with($cleaned, '+')) {
-                    // If it's a 10-digit Indian number, add +91
-                    if (strlen($cleaned) === 10) {
-                        $cleaned = '+91' . $cleaned;
-                    } else {
-                        $cleaned = '+' . $cleaned;
-                    }
-                }
-                $toNumber = 'whatsapp:' . $cleaned;
+            $toNumber = PhoneNumberHelper::formatForWhatsApp($customer->whatsapp_number);
+            
+            if (empty($toNumber)) {
+                throw new ValidationException(
+                    'Invalid customer WhatsApp number format',
+                    ['whatsapp_number' => ['Invalid WhatsApp number format']]
+                );
             }
 
             Log::info('Sending WhatsApp message', [
@@ -158,6 +208,9 @@ class WhatsAppService
                 $errorMessage = 'Invalid "from" phone number. Please check your Twilio WhatsApp number configuration.';
             } elseif ($errorCode === 20003) {
                 $errorMessage = 'Twilio authentication failed. Please check your Account SID and Auth Token.';
+            } else {
+                // Generic error message for unknown Twilio errors
+                $errorMessage = 'Failed to send WhatsApp message. Please try again later.';
             }
             
             Log::error('WhatsApp message failed (Twilio Error)', [
@@ -171,12 +224,7 @@ class WhatsAppService
                 'twilio_status' => method_exists($e, 'getStatusCode') ? $e->getStatusCode() : null,
             ]);
 
-            return [
-                'success' => false,
-                'error' => $errorMessage,
-                'error_code' => $errorCode,
-                'twilio_error' => $e->getMessage(),
-            ];
+            throw new ServiceException($errorMessage);
         } catch (\Exception $e) {
             Log::error('WhatsApp message failed (General Error)', [
                 'customer_id' => $customer->id,
@@ -188,21 +236,17 @@ class WhatsAppService
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            return [
-                'success' => false,
-                'error' => $e->getMessage(),
-                'error_code' => $e->getCode(),
-            ];
+            $errorMessage = config('app.debug') 
+                ? $e->getMessage() 
+                : 'Failed to send WhatsApp message. Please try again later.';
+
+            throw new ServiceException($errorMessage);
         }
     }
 
     public function validateWhatsAppNumber(string $number): bool
     {
-        // Remove any non-digit characters except +
-        $cleaned = preg_replace('/[^\d+]/', '', $number);
-
-        // Check if it starts with + and has valid format
-        return preg_match('/^\+[1-9]\d{1,14}$/', $cleaned) === 1;
+        return PhoneNumberHelper::validate($number);
     }
 }
 
