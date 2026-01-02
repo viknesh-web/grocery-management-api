@@ -19,6 +19,9 @@ class CategoryController extends Controller
         private CategoryService $categoryService
     ) {}
 
+    /**
+     * Get paginated list of categories (GET request - for REST API)
+     */
     public function index(Request $request)
     {
         $filters = [
@@ -36,6 +39,39 @@ class CategoryController extends Controller
         return ApiResponse::paginated($categories);
     }
 
+    /**
+     * Get paginated list of categories (POST request - matches reference project pattern)
+     * This method accepts POST requests without validation, following hifit-erp-server pattern
+     */
+    public function list(Request $request)
+    {
+        $datas = $request->all();
+
+        $flt_page = isset($datas['page']) ? intval($datas['page']) : 0;
+        $flt_limit = isset($datas['limit']) ? intval($datas['limit']) : 10;
+        $flt_sort = isset($datas['sort']) ? (strtoupper(trim($datas['sort'])) == 'DESC' ? 'DESC' : 'ASC') : 'ASC';
+        $flt_orderby = isset($datas['orderby']) ? trim($datas['orderby']) : 'name';
+        
+        $filters = [
+            'status' => $request->get('status'),
+            'root' => $request->boolean('root'),
+            'parent_id' => $request->get('parent_id'),
+            'search' => $request->get('search'),
+            'sort_by' => $flt_orderby,
+            'sort_order' => strtolower($flt_sort),
+        ];
+
+        $perPage = $flt_limit;
+        $categories = $this->categoryService->getPaginated($filters, $perPage);
+
+        // Transform to match reference project response format: { data: [], total: number, page: number }
+        return response()->json([
+            'data' => $categories->items(),
+            'total' => $categories->total(),
+            'page' => $flt_page
+        ]);
+    }
+
     public function store(StoreCategoryRequest $request)
     {
         $data = $request->validated();
@@ -44,12 +80,28 @@ class CategoryController extends Controller
         return ApiResponse::success($category->toArray(), 'Category created successfully', 201);
     }
 
+    /**
+     * Get a single category by ID (REST API - GET /categories/{category})
+     */
     public function show(Request $request)
     {
         $category = $request->get('category');
-        $category->load(['creator', 'updater', 'parent']);
+        // $category->load(['parent']);
         
         return ApiResponse::success($category->toArray());
+    }
+
+    /**
+     * Get category detail (matches reference project pattern - GET /categories/{category}/detail)
+     */
+    public function detail(Request $request)
+    {
+        $category = $request->get('category');
+        // $category->load(['parent']);
+        
+        return response()->json([
+            'data' => $category->toArray()
+        ]);
     }
 
     public function update(UpdateCategoryRequest $request)
