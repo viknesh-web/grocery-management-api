@@ -2,131 +2,148 @@
 
 namespace App\Http\Controllers\API;
 
+use App\Exceptions\ValidationException;
 use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
-use App\Models\User;
+use App\Http\Requests\Auth\LoginRequest;
+use App\Http\Requests\Auth\RegisterRequest;
+use App\Http\Requests\Auth\UpdateProfileRequest;
+use App\Services\AuthService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
 
 /**
  * Authentication Controller
  * 
- * Handles user authentication, registration, and session management.
+ * Handles HTTP requests for authentication operations.
+ * 
+ * Responsibilities:
+ * - HTTP request/response handling
+ * - Input validation (via FormRequest classes)
+ * - Service method calls
+ * - Response formatting (via ApiResponse helper)
+ * - Exception handling
+ * 
+ * Does NOT contain:
+ * - Business logic
+ * - Direct User model queries
+ * - Password hashing
+ * - Token generation
  */
 class AuthController extends Controller
 {
+    public function __construct(
+        private AuthService $authService
+    ) {}
+
     /**
      * Register a new admin user.
+     *
+     * @param RegisterRequest $request
+     * @return JsonResponse
      */
-    public function register(Request $request)
+    public function register(RegisterRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
-        ]);
+        try {
+            $data = $this->authService->register($request->validated());
 
-        $user = User::create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'password' => Hash::make($validated['password']),
-        ]);
-
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        return response()->json([
-            'success' => true,
-            'message' => 'User registered successfully',
-            'data' => [
-                'user' => $user->toArray(),
-                'token' => $token,
-                'token_type' => 'Bearer',
-            ],
-        ], 201);
+            return ApiResponse::success($data, 'User registered successfully', 201);
+        } catch (ValidationException $e) {
+            return ApiResponse::validationError($e->getErrors(), $e->getMessage());
+        } catch (\Exception $e) {
+            return ApiResponse::error(
+                'Registration failed. Please try again later.',
+                null,
+                500
+            );
+        }
     }
 
     /**
      * Login user and return token.
+     *
+     * @param LoginRequest $request
+     * @return JsonResponse
      */
-    public function login(Request $request)
+    public function login(LoginRequest $request): JsonResponse
     {
-        $request->validate([
-            'email' => ['required', 'email'],
-            'password' => ['required'],
-        ]);
+        try {
+            $data = $this->authService->login(
+                $request->input('email'),
+                $request->input('password')
+            );
 
-        $user = User::where('email', $request->email)->first();
-
-        if (!$user || !Hash::check($request->password, $user->password)) {
-            throw ValidationException::withMessages([
-                'email' => ['The provided credentials are incorrect.'],
-            ]);
+            return ApiResponse::success($data, 'Login successful');
+        } catch (ValidationException $e) {
+            return ApiResponse::validationError($e->getErrors(), $e->getMessage());
+        } catch (\Exception $e) {
+            return ApiResponse::error(
+                'Login failed. Please try again later.',
+                null,
+                500
+            );
         }
-
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Login successful',
-            'data' => [
-                'user' => $user->toArray(),
-                'token' => $token,
-                'token_type' => 'Bearer',
-            ],
-        ]);
     }
 
     /**
      * Get the authenticated user.
+     *
+     * @param Request $request
+     * @return JsonResponse
      */
-    public function user(Request $request)
+    public function user(Request $request): JsonResponse
     {
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'user' => $request->user()->toArray(),
-            ],
-        ]);
+        try {
+            $data = $this->authService->getUser($request->user());
+            return ApiResponse::success($data);
+        } catch (\Exception $e) {
+            return ApiResponse::error(
+                'Unable to fetch user information. Please try again later.',
+                null,
+                500
+            );
+        }
     }
 
     /**
      * Update the authenticated user's profile.
+     *
+     * @param UpdateProfileRequest $request
+     * @return JsonResponse
      */
-    public function updateProfile(Request $request)
+    public function updateProfile(UpdateProfileRequest $request): JsonResponse
     {
-        $user = $request->user();
-
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email,' . $user->id],
-        ]);
-
-        $user->update([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Profile updated successfully',
-            'data' => [
-                'user' => $user->toArray(),
-            ],
-        ]);
+        try {
+            $data = $this->authService->updateProfile($request->user(), $request->validated());
+            return ApiResponse::success($data, 'Profile updated successfully');
+        } catch (ValidationException $e) {
+            return ApiResponse::validationError($e->getErrors(), $e->getMessage());
+        } catch (\Exception $e) {
+            return ApiResponse::error(
+                'Profile update failed. Please try again later.',
+                null,
+                500
+            );
+        }
     }
 
     /**
      * Logout the authenticated user.
+     *
+     * @param Request $request
+     * @return JsonResponse
      */
-    public function logout(Request $request)
+    public function logout(Request $request): JsonResponse
     {
-        $request->user()->currentAccessToken()->delete();
-
-        return ApiResponse::success(null, 'Logged out successfully');
+        try {
+            $this->authService->logout($request->user());
+            return ApiResponse::success(null, 'Logged out successfully');
+        } catch (\Exception $e) {
+            return ApiResponse::error(
+                'Logout failed. Please try again later.',
+                null,
+                500
+            );
+        }
     }
 }
-
-
-

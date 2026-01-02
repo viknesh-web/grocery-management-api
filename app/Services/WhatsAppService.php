@@ -6,128 +6,123 @@ use App\Exceptions\ServiceException;
 use App\Exceptions\ValidationException;
 use App\Helpers\PhoneNumberHelper;
 use App\Models\Customer;
-use App\Services\PdfService;
+use App\Repositories\CustomerRepository;
 use Illuminate\Support\Facades\Log;
-use Twilio\Rest\Client;
-use Twilio\Exceptions\RestException;
 
+/**
+ * WhatsApp Service
+ * 
+ * Handles all business logic for WhatsApp operations.
+ * 
+ * Responsibilities:
+ * - Business logic orchestration
+ * - Customer selection and filtering
+ * - PDF generation coordination (delegated to PdfService)
+ * - Message preparation and formatting
+ * - Batch operations
+ * - Job dispatching
+ * - Phone number normalization (via PhoneNumberHelper)
+ * 
+ * Does NOT contain:
+ * - Direct Twilio API calls (delegated to TwilioService)
+ * - Direct customer queries (uses CustomerRepository)
+ * - PDF generation logic (delegated to PdfService)
+ */
 class WhatsAppService
 {
-    protected Client $twilio;
-    protected PdfService $pdfService;
-    protected string $whatsappNumber;
+    public function __construct(
+        private TwilioService $twilioService,
+        private PdfService $pdfService,
+        private CustomerRepository $customerRepository
+    ) {}
 
-    public function __construct(PdfService $pdfService)
-    {
-        $this->pdfService = $pdfService;
-        $this->twilio = new Client(
-            config('services.twilio.account_sid'),
-            config('services.twilio.auth_token')
-        );
-        // Ensure WhatsApp number has the correct format
-        $whatsappNumber = config('services.twilio.whatsapp_number');
-        if (!str_starts_with($whatsappNumber, 'whatsapp:')) {
-            // Keep the + sign, Twilio WhatsApp requires whatsapp:+14155238886 format
-            $whatsappNumber = 'whatsapp:' . $whatsappNumber;
-        }
-        $this->whatsappNumber = $whatsappNumber;
-    }
-
-    public function sendPriceListToCustomers(?array $customerIds = null, ?string $customMessage = null, bool $includePdf = true, ?array $productIds = null, ?string $templateId = null, ?array $contentVariables = null, ?string $customPdfUrl = null, string $pdfLayout = 'regular', bool $async = true): array
-    {
-        // Generate PDF if needed
+    /**
+     * Send price list to customers.
+     * 
+     * Handles:
+     * - PDF generation (delegated to PdfService)
+     * - Customer selection (via CustomerRepository)
+     * - Batch job dispatching (if async)
+     * - Synchronous sending (if not async)
+     * - Message preparation
+     *
+     * @param array|null $customerIds Specific customer IDs (null = all active customers)
+     * @param string|null $customMessage Custom message text
+     * @param bool $includePdf Whether to include PDF
+     * @param array|null $productIds Product IDs for PDF generation
+     * @param string|null $templateId Twilio Content Template ID
+     * @param array|null $contentVariables Variables for Content Template
+     * @param string|null $customPdfUrl Custom PDF URL (if uploaded)
+     * @param string $pdfLayout PDF layout ('regular' or 'catalog')
+     * @param bool $async Whether to send asynchronously
+     * @return array Result array with status, message, and results
+     */
+    public function sendPriceListToCustomers(
+        ?array $customerIds = null,
+        ?string $customMessage = null,
+        bool $includePdf = true,
+        ?array $productIds = null,
+        ?string $templateId = null,
+        ?array $contentVariables = null,
+        ?string $customPdfUrl = null,
+        string $pdfLayout = 'regular',
+        bool $async = true
+    ): array {
+        // Generate PDF if needed (business logic - determine when to generate)
         $pdfUrl = null;
         if ($includePdf) {
-            if ($customPdfUrl !== null) {
-                // Use custom uploaded PDF
-                $pdfUrl = $customPdfUrl;
-            } else {
-                // Generate PDF from products and forward requested layout
-                $pdfPath = $this->pdfService->generatePriceList($productIds ?? [], $pdfLayout);
-                $pdfUrl = $this->pdfService->getPdfUrl($pdfPath);
-            }
+            $pdfUrl = $this->preparePdfUrl($customPdfUrl, $productIds, $pdfLayout);
         }
 
-        // If async, dispatch batch job
+        // If async, dispatch batch job (business logic - async vs sync)
         if ($async) {
-            \App\Jobs\WhatsAppMessageBatch::dispatch(
+            return $this->dispatchBatchJob(
                 $customerIds,
                 $customMessage,
                 $pdfUrl,
                 $templateId,
                 $contentVariables
             );
-
-            // Return immediate response
-            $customerCount = $customerIds 
-                ? count($customerIds) 
-                : Customer::where('status', 'active')->count();
-
-            return [
-                'status' => 'queued',
-                'message' => "Messages queued for {$customerCount} customer(s)",
-                'customer_count' => $customerCount,
-            ];
         }
 
-        // Fallback to synchronous sending (existing code)
-        $results = [];
-        
-        // Process customers in chunks to avoid memory issues with large lists
-        if ($customerIds === null || empty($customerIds)) {
-            // Send to all active customers in chunks
-            Customer::where('status', 'active')
-                ->chunk(100, function ($customers) use (&$results, $customMessage, $pdfUrl, $templateId, $contentVariables) {
-                    foreach ($customers as $customer) {
-                        try {
-                            $result = $this->sendMessage($customer, $customMessage, $pdfUrl, $templateId, $contentVariables);
-                            $results[] = array_merge([
-                                'customer_id' => $customer->id,
-                                'customer_name' => $customer->name,
-                            ], $result);
-                        } catch (\Throwable $e) {
-                            $results[] = [
-                                'customer_id' => $customer->id,
-                                'customer_name' => $customer->name,
-                                'success' => false,
-                                'error' => $e->getMessage(),
-                            ];
-                        }
-                    }
-                });
-        } else {
-            // Process specific customer IDs in chunks
-            Customer::whereIn('id', $customerIds)
-                ->chunk(100, function ($customers) use (&$results, $customMessage, $pdfUrl, $templateId, $contentVariables) {
-                    foreach ($customers as $customer) {
-                        try {
-                            $result = $this->sendMessage($customer, $customMessage, $pdfUrl, $templateId, $contentVariables);
-                            $results[] = array_merge([
-                                'customer_id' => $customer->id,
-                                'customer_name' => $customer->name,
-                            ], $result);
-                        } catch (\Throwable $e) {
-                            $results[] = [
-                                'customer_id' => $customer->id,
-                                'customer_name' => $customer->name,
-                                'success' => false,
-                                'error' => $e->getMessage(),
-                            ];
-                        }
-                    }
-                });
-        }
-
-        return $results;
+        // Synchronous sending (business logic - process customers)
+        return $this->sendToCustomersSynchronously(
+            $customerIds,
+            $customMessage,
+            $pdfUrl,
+            $templateId,
+            $contentVariables
+        );
     }
 
-    public function sendMessage(Customer $customer, ?string $message = null, ?string $pdfUrl = null, ?string $templateId = null, ?array $contentVariables = null): array
-    {
+    /**
+     * Send a WhatsApp message to a single customer.
+     * 
+     * Handles:
+     * - Phone number normalization (via PhoneNumberHelper)
+     * - Message preparation (template vs plain text)
+     * - Twilio API call (delegated to TwilioService)
+     * - Error handling and logging
+     *
+     * @param Customer $customer
+     * @param string|null $message Plain text message
+     * @param string|null $pdfUrl PDF URL to attach
+     * @param string|null $templateId Twilio Content Template ID
+     * @param array|null $contentVariables Variables for Content Template
+     * @return array Result array with success status, message_sid, and status
+     * @throws ValidationException If phone number is invalid
+     * @throws ServiceException If message sending fails
+     */
+    public function sendMessage(
+        Customer $customer,
+        ?string $message = null,
+        ?string $pdfUrl = null,
+        ?string $templateId = null,
+        ?array $contentVariables = null
+    ): array {
         try {
-            // Ensure WhatsApp number format is correct (already formatted in constructor)
-            $fromNumber = $this->whatsappNumber;
-
-            // Ensure customer WhatsApp number format is correct
+            // Normalize and format phone numbers (business logic - phone number handling)
+            $fromNumber = $this->twilioService->getWhatsAppNumber();
             $toNumber = PhoneNumberHelper::formatForWhatsApp($customer->whatsapp_number);
             
             if (empty($toNumber)) {
@@ -146,42 +141,25 @@ class WhatsAppService
                 'template_id' => $templateId,
             ]);
 
-            // Build message data - conditional logic for template vs plain text
-            $messageData = [
-                'from' => $fromNumber,
-            ];
-
-            if (!empty($templateId)) {
-                // Use Twilio Content Template
-                $messageData['contentSid'] = $templateId;
-                
-                // Add content variables if provided
-                if (!empty($contentVariables) && is_array($contentVariables)) {
-                    $messageData['contentVariables'] = json_encode($contentVariables);
-                }
-            } else {
-                // Use plain text message (existing behavior)
-                $messageBody = $message ?? str_replace(
-                    '{{name}}',
-                    $customer->name,
-                    config('services.twilio.default_message', 'Hello {{name}}, here is today\'s price list.')
-                );
-                $messageData['body'] = $messageBody;
-            }
+            // Prepare message data (business logic - message formatting)
+            // Replace {{name}} placeholder with customer name if message is provided
+            $processedMessage = $message ? str_replace('{{name}}', $customer->name, $message) : null;
             
-            if ($pdfUrl) {
-               $messageData['mediaUrl'] = [$pdfUrl];
-            }
-
-            
-            $message = $this->twilio->messages->create(
-                $toNumber,
-                $messageData
+            $messageData = $this->prepareMessageData(
+                $processedMessage,
+                $templateId,
+                $contentVariables,
+                $pdfUrl,
+                $fromNumber,
+                $customer->name
             );
 
+            // Send message via Twilio (delegated to TwilioService)
+            $twilioResponse = $this->twilioService->sendWhatsAppMessage($toNumber, $messageData);
+
             Log::info('WhatsApp message sent successfully', [
-                'message_sid' => $message->sid,
-                'status' => $message->status,
+                'message_sid' => $twilioResponse['sid'],
+                'status' => $twilioResponse['status'],
                 'customer_id' => $customer->id,
                 'customer_name' => $customer->name,
                 'to' => $toNumber,
@@ -189,50 +167,22 @@ class WhatsAppService
 
             return [
                 'success' => true,
-                'message_sid' => $message->sid,
-                'status' => $message->status,
+                'message_sid' => $twilioResponse['sid'],
+                'status' => $twilioResponse['status'],
             ];
-        } catch (\Twilio\Exceptions\RestException $e) {
-            // Twilio-specific error handling
-            $errorMessage = $e->getMessage();
-            $errorCode = $e->getCode();
-            
-            // Provide user-friendly error messages for common Twilio errors
-            if ($errorCode === 21211) {
-                $errorMessage = 'Invalid recipient phone number. Please check the customer\'s WhatsApp number format.';
-            } elseif ($errorCode === 21608) {
-                $errorMessage = 'Recipient has not joined the Twilio WhatsApp sandbox. They need to send "join [code]" to +14155238886 first.';
-            } elseif ($errorCode === 21614) {
-                $errorMessage = 'WhatsApp number is not registered with Twilio. Please verify your Twilio WhatsApp configuration.';
-            } elseif ($errorCode === 21217) {
-                $errorMessage = 'Invalid "from" phone number. Please check your Twilio WhatsApp number configuration.';
-            } elseif ($errorCode === 20003) {
-                $errorMessage = 'Twilio authentication failed. Please check your Account SID and Auth Token.';
-            } else {
-                // Generic error message for unknown Twilio errors
-                $errorMessage = 'Failed to send WhatsApp message. Please try again later.';
-            }
-            
-            Log::error('WhatsApp message failed (Twilio Error)', [
-                'customer_id' => $customer->id,
-                'customer_name' => $customer->name,
-                'customer_whatsapp' => $customer->whatsapp_number,
-                'from_number' => $this->whatsappNumber,
-                'to_number' => $toNumber ?? 'not formatted',
-                'error' => $e->getMessage(),
-                'error_code' => $errorCode,
-                'twilio_status' => method_exists($e, 'getStatusCode') ? $e->getStatusCode() : null,
-            ]);
-
-            throw new ServiceException($errorMessage);
+        } catch (ValidationException $e) {
+            // Re-throw validation exceptions
+            throw $e;
+        } catch (ServiceException $e) {
+            // Re-throw service exceptions (already logged by TwilioService)
+            throw $e;
         } catch (\Exception $e) {
-            Log::error('WhatsApp message failed (General Error)', [
+            // Log unexpected errors
+            Log::error('WhatsApp message failed (Unexpected Error)', [
                 'customer_id' => $customer->id,
                 'customer_name' => $customer->name,
                 'customer_whatsapp' => $customer->whatsapp_number,
-                'from_number' => $this->whatsappNumber,
                 'error' => $e->getMessage(),
-                'error_code' => $e->getCode(),
                 'trace' => $e->getTraceAsString(),
             ]);
 
@@ -244,10 +194,214 @@ class WhatsAppService
         }
     }
 
+    /**
+     * Validate WhatsApp number format.
+     * 
+     * Delegates to PhoneNumberHelper for validation.
+     *
+     * @param string $number
+     * @return bool
+     */
     public function validateWhatsAppNumber(string $number): bool
     {
         return PhoneNumberHelper::validate($number);
     }
+
+    /**
+     * Prepare PDF URL for sending.
+     * 
+     * Business logic: Determines whether to use custom PDF or generate new one.
+     *
+     * @param string|null $customPdfUrl
+     * @param array|null $productIds
+     * @param string $pdfLayout
+     * @return string|null
+     */
+    protected function preparePdfUrl(?string $customPdfUrl, ?array $productIds, string $pdfLayout): ?string
+    {
+        if ($customPdfUrl !== null) {
+            // Use custom uploaded PDF
+            return $customPdfUrl;
+        }
+
+        // Generate PDF from products (delegated to PdfService)
+        $pdfPath = $this->pdfService->generatePriceList($productIds ?? [], $pdfLayout);
+        return $this->pdfService->getPdfUrl($pdfPath);
+    }
+
+    /**
+     * Dispatch batch job for async sending.
+     * 
+     * Business logic: Queues messages for background processing.
+     *
+     * @param array|null $customerIds
+     * @param string|null $customMessage
+     * @param string|null $pdfUrl
+     * @param string|null $templateId
+     * @param array|null $contentVariables
+     * @return array
+     */
+    protected function dispatchBatchJob(
+        ?array $customerIds,
+        ?string $customMessage,
+        ?string $pdfUrl,
+        ?string $templateId,
+        ?array $contentVariables
+    ): array {
+        \App\Jobs\WhatsAppMessageBatch::dispatch(
+            $customerIds,
+            $customMessage,
+            $pdfUrl,
+            $templateId,
+            $contentVariables
+        );
+
+        // Get customer count (business logic - determine count)
+        $customerCount = $customerIds 
+            ? count($customerIds) 
+            : $this->customerRepository->countByFilters(['status' => 'active']);
+
+        return [
+            'status' => 'queued',
+            'message' => "Messages queued for {$customerCount} customer(s)",
+            'customer_count' => $customerCount,
+        ];
+    }
+
+    /**
+     * Send messages to customers synchronously.
+     * 
+     * Business logic: Processes customers in chunks and sends messages.
+     *
+     * @param array|null $customerIds
+     * @param string|null $customMessage
+     * @param string|null $pdfUrl
+     * @param string|null $templateId
+     * @param array|null $contentVariables
+     * @return array
+     */
+    protected function sendToCustomersSynchronously(
+        ?array $customerIds,
+        ?string $customMessage,
+        ?string $pdfUrl,
+        ?string $templateId,
+        ?array $contentVariables
+    ): array {
+        $results = [];
+        
+        // Process customers in chunks to avoid memory issues (business logic - chunking)
+        // Use query builder chunking for memory efficiency
+        if ($customerIds === null || empty($customerIds)) {
+            // Send to all active customers in chunks
+            Customer::where('status', 'active')
+                ->chunk(100, function ($customers) use (&$results, $customMessage, $pdfUrl, $templateId, $contentVariables) {
+                    $this->processCustomerChunk($customers, $results, $customMessage, $pdfUrl, $templateId, $contentVariables);
+                });
+        } else {
+            // Process specific customer IDs in chunks
+            Customer::whereIn('id', $customerIds)
+                ->chunk(100, function ($customers) use (&$results, $customMessage, $pdfUrl, $templateId, $contentVariables) {
+                    $this->processCustomerChunk($customers, $results, $customMessage, $pdfUrl, $templateId, $contentVariables);
+                });
+        }
+
+        return $results;
+    }
+
+    /**
+     * Process a chunk of customers and send messages.
+     * 
+     * Business logic: Handles individual customer sending with error handling.
+     *
+     * @param \Illuminate\Support\Collection $customers
+     * @param array $results Reference to results array
+     * @param string|null $customMessage
+     * @param string|null $pdfUrl
+     * @param string|null $templateId
+     * @param array|null $contentVariables
+     * @return void
+     */
+    protected function processCustomerChunk(
+        \Illuminate\Support\Collection $customers,
+        array &$results,
+        ?string $customMessage,
+        ?string $pdfUrl,
+        ?string $templateId,
+        ?array $contentVariables
+    ): void {
+        foreach ($customers as $customer) {
+            try {
+                $result = $this->sendMessage($customer, $customMessage, $pdfUrl, $templateId, $contentVariables);
+                $results[] = array_merge([
+                    'customer_id' => $customer->id,
+                    'customer_name' => $customer->name,
+                ], $result);
+            } catch (\Throwable $e) {
+                // Log individual customer error but continue with others
+                Log::warning('Failed to send WhatsApp message to customer', [
+                    'customer_id' => $customer->id,
+                    'customer_name' => $customer->name,
+                    'error' => $e->getMessage(),
+                ]);
+
+                $results[] = [
+                    'customer_id' => $customer->id,
+                    'customer_name' => $customer->name,
+                    'success' => false,
+                    'error' => $e->getMessage(),
+                ];
+            }
+        }
+    }
+
+    /**
+     * Prepare message data for Twilio API.
+     * 
+     * Business logic: Formats message data based on template vs plain text.
+     *
+     * @param string|null $message Plain text message (with {{name}} already replaced)
+     * @param string|null $templateId Twilio Content Template ID
+     * @param array|null $contentVariables Variables for Content Template
+     * @param string|null $pdfUrl PDF URL to attach
+     * @param string $fromNumber Sender WhatsApp number
+     * @param string|null $customerName Customer name for default message replacement
+     * @return array Message data for Twilio API
+     */
+    protected function prepareMessageData(
+        ?string $message,
+        ?string $templateId,
+        ?array $contentVariables,
+        ?string $pdfUrl,
+        string $fromNumber,
+        ?string $customerName = null
+    ): array {
+        $messageData = [
+            'from' => $fromNumber,
+        ];
+
+        if (!empty($templateId)) {
+            // Use Twilio Content Template
+            $messageData['contentSid'] = $templateId;
+            
+            // Add content variables if provided
+            if (!empty($contentVariables) && is_array($contentVariables)) {
+                $messageData['contentVariables'] = json_encode($contentVariables);
+            }
+        } else {
+            // Use plain text message
+            $messageBody = $message ?? str_replace(
+                '{{name}}',
+                $customerName ?? '',
+                config('services.twilio.default_message', 'Hello {{name}}, here is today\'s price list.')
+            );
+            $messageData['body'] = $messageBody;
+        }
+        
+        // Add PDF attachment if provided
+        if ($pdfUrl) {
+            $messageData['mediaUrl'] = [$pdfUrl];
+        }
+
+        return $messageData;
+    }
 }
-
-

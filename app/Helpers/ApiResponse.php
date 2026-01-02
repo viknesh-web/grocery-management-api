@@ -39,38 +39,29 @@ class ApiResponse
 
     /**
      * Create a paginated response.
+     * 
+     * Returns a standardized paginated response format:
+     * {
+     *   "success": true,
+     *   "data": [...],
+     *   "total": 500,
+     *   "page": 0  // 0-indexed page number
+     * }
      *
      * @param LengthAwarePaginator $paginator
-     * @param array $meta Additional metadata to include
-     * @param string|null $message
+     * @param string|null $message Optional success message (not included in simplified format)
      * @return JsonResponse
      */
-    public static function paginated(LengthAwarePaginator $paginator, array $meta = [], ?string $message = null): JsonResponse
+    public static function paginated(LengthAwarePaginator $paginator, ?string $message = null): JsonResponse
     {
-        $response = [
+        $requestedPage = request()->get('page', 1);
+        
+        return response()->json([
             'success' => true,
             'data' => $paginator->items(),
-            'meta' => array_merge([
-                'current_page' => $paginator->currentPage(),
-                'from' => $paginator->firstItem(),
-                'last_page' => $paginator->lastPage(),
-                'per_page' => $paginator->perPage(),
-                'to' => $paginator->lastItem(),
-                'total' => $paginator->total(),
-            ], $meta),
-            'links' => [
-                'first' => $paginator->url(1),
-                'last' => $paginator->url($paginator->lastPage()),
-                'prev' => $paginator->previousPageUrl(),
-                'next' => $paginator->nextPageUrl(),
-            ],
-        ];
-
-        if ($message !== null) {
-            $response['message'] = $message;
-        }
-
-        return response()->json($response, 200);
+            'total' => $paginator->total(),
+            'page' => max(0, intval($requestedPage) - 1), // 0-indexed
+        ]);
     }
 
     /**

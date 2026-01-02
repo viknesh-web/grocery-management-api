@@ -32,8 +32,6 @@ class Category extends Model
         'products_count',
     ];
 
-
-
     /**
      * Get all products in this category.
      */

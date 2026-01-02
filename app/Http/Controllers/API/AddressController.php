@@ -2,44 +2,52 @@
 
 namespace App\Http\Controllers\API;
 
+use App\Exceptions\ServiceException;
+use App\Exceptions\ValidationException;
 use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
-use App\Models\Address;
+use App\Http\Requests\Address\SearchUAERequest;
 use App\Services\AddressService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 
 /**
  * Address Controller
  * 
- * Handles address management operations including CRUD and UAE address search.
+ * Handles HTTP requests for address operations.
+ * 
+ * Responsibilities:
+ * - HTTP request/response handling
+ * - Input validation (via FormRequest classes)
+ * - Service method calls
+ * - Response formatting (via ApiResponse helper)
+ * - Exception handling
+ * 
+ * Does NOT contain:
+ * - Business logic
+ * - Direct Geoapify API calls
+ * - Cache management
  */
 class AddressController extends Controller
 {
-    protected AddressService $addressService;
-
-    public function __construct(AddressService $addressService)
-    {
-        $this->addressService = $addressService;
-    }  
+    public function __construct(
+        private AddressService $addressService
+    ) {}
 
     /**
      * Search UAE areas using Geoapify API.
+     *
+     * @param SearchUAERequest $request
+     * @return JsonResponse
      */
-    public function searchUAE(Request $request)
+    public function searchUAE(SearchUAERequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'query' => ['required', 'string', 'min:2', 'max:100'],
-        ]);
-
         try {
-            $areas = $this->addressService->searchUAEAreas($validated['query']);
+            $areas = $this->addressService->searchUAEAreas($request->input('query'));
             return ApiResponse::success($areas);
-        } catch (\InvalidArgumentException $e) {
-            return ApiResponse::validationError(
-                ['query' => [$e->getMessage()]],
-                'Invalid search query'
-            );
+        } catch (ValidationException $e) {
+            return ApiResponse::validationError($e->getErrors(), $e->getMessage());
+        } catch (ServiceException $e) {
+            return ApiResponse::error($e->getMessage(), null, 500);
         } catch (\Exception $e) {
             return ApiResponse::error(
                 'Unable to search addresses. Please try again later.',
@@ -49,6 +57,3 @@ class AddressController extends Controller
         }
     }
 }
-
-
-

@@ -4,10 +4,25 @@ namespace App\Services;
 
 use Illuminate\Database\Eloquent\Builder;
 
+/**
+ * Product Filter Service
+ * 
+ * @deprecated This service is deprecated. Product filtering is now handled by Product model scopes.
+ * Use ProductRepository methods which internally use Product::filter() and Product::sortBy() scopes.
+ * 
+ * This service is kept for backward compatibility but should not be used in new code.
+ * 
+ * Migration path:
+ * - Instead of: $filterService->applyFilters($query, $filters)
+ * - Use: $productRepository->all($filters) or $productRepository->paginate($filters)
+ * - Or directly: Product::filter($filters)->sortBy($sortBy, $sortOrder)
+ */
 class ProductFilterService
 {
     /**
      * Apply all filters to the query.
+     * 
+     * @deprecated Use Product::filter($filters) scope instead
      *
      * @param Builder $query
      * @param array $filters
@@ -15,47 +30,14 @@ class ProductFilterService
      */
     public function applyFilters(Builder $query, array $filters): Builder
     {
-        // Search
-        if (isset($filters['search']) && !empty($filters['search'])) {
-            $query = $this->applySearch($query, $filters['search']);
-        }
-
-        // Category filter
-        if (isset($filters['category_id']) && !empty($filters['category_id'])) {
-            $query->where('category_id', $filters['category_id']);
-        }
-
-        // Product type filter
-        if (isset($filters['product_type']) && in_array($filters['product_type'], ['daily', 'standard'])) {
-            $query->where('product_type', $filters['product_type']);
-        }
-
-        // Status filter
-        if (isset($filters['status']) && in_array($filters['status'], ['active', 'inactive'])) {
-            $query->where('status', $filters['status']);
-        }
-
-        // Discount filter - uses Product model scopes for date-range logic
-        if (isset($filters['has_discount'])) {
-            $hasDiscount = filter_var($filters['has_discount'], FILTER_VALIDATE_BOOLEAN);
-            
-            if ($hasDiscount) {
-                $query->withActiveDiscount();
-            } else {
-                $query->withoutActiveDiscount();
-            }
-        }
-
-        // Stock status filter
-        if (isset($filters['stock_status'])) {
-            $query = $this->applyStockStatusFilter($query, $filters['stock_status']);
-        }
-
-        return $query;
+        // Delegate to Product model scopeFilter() for consistency
+        return $query->filter($filters);
     }
 
     /**
      * Apply search to the query.
+     * 
+     * @deprecated Use Product::filter(['search' => $term]) instead
      *
      * @param Builder $query
      * @param string $searchTerm
@@ -63,14 +45,14 @@ class ProductFilterService
      */
     public function applySearch(Builder $query, string $searchTerm): Builder
     {
-        return $query->where(function ($q) use ($searchTerm) {
-            $q->where('name', 'like', "%{$searchTerm}%")
-                ->orWhere('item_code', 'like', "%{$searchTerm}%");
-        });
+        // Delegate to Product model scopeFilter() for consistency
+        return $query->filter(['search' => $searchTerm]);
     }
 
     /**
      * Apply stock status filter.
+     * 
+     * @deprecated Use Product::filter(['stock_status' => $status]) instead
      *
      * @param Builder $query
      * @param string $status
@@ -78,21 +60,14 @@ class ProductFilterService
      */
     public function applyStockStatusFilter(Builder $query, string $status): Builder
     {
-        switch ($status) {
-            case 'in_stock':
-                return $query->where('stock_quantity', '>', 10);
-            case 'low_stock':
-                return $query->where('stock_quantity', '>', 0)
-                    ->where('stock_quantity', '<=', 10);
-            case 'out_of_stock':
-                return $query->where('stock_quantity', '<=', 0);
-            default:
-                return $query;
-        }
+        // Delegate to Product model scopeStockStatus() for consistency
+        return $query->stockStatus($status);
     }
 
     /**
      * Apply sorting to the query.
+     * 
+     * @deprecated Use Product::sortBy($sortBy, $sortOrder) scope instead
      *
      * @param Builder $query
      * @param string|null $sortBy
@@ -101,31 +76,14 @@ class ProductFilterService
      */
     public function applySorting(Builder $query, ?string $sortBy, string $sortOrder = 'asc'): Builder
     {
-        $allowedSortFields = ['name', 'regular_price', 'selling_price', 'stock_quantity', 'created_at', 'product_type'];
-        $sortOrder = strtolower($sortOrder) === 'desc' ? 'desc' : 'asc';
-
-        if ($sortBy && in_array($sortBy, $allowedSortFields)) {
-            // For calculated fields, we need special handling
-            if ($sortBy === 'selling_price') {
-                // Sort by regular_price and discount for selling_price approximation
-                $query->orderBy('regular_price', $sortOrder);
-            } else {
-                $query->orderBy($sortBy, $sortOrder);
-            }
-        } else {
-            $query->orderBy('created_at', 'desc');
-        }
-
-        // Secondary sort by name for consistency
-        if ($sortBy !== 'name') {
-            $query->orderBy('name', 'asc');
-        }
-
-        return $query;
+        // Delegate to Product model scopeSortBy() for consistency
+        return $query->sortBy($sortBy ?? 'created_at', $sortOrder);
     }
 
     /**
      * Get filter metadata.
+     * 
+     * @deprecated This method is no longer needed. Use repository methods for metadata.
      *
      * @param Builder $query
      * @param array $filters
@@ -141,5 +99,3 @@ class ProductFilterService
         ];
     }
 }
-
-
