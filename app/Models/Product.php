@@ -2,11 +2,11 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
@@ -27,6 +27,12 @@ class Product extends Model
         'product_type',
         'created_by',
         'updated_by',
+    ];
+
+    protected $hidden = [
+        'created_by',
+        'updated_by',
+        'deleted_at',
     ];
 
     protected $casts = [
@@ -214,16 +220,19 @@ class Product extends Model
 
     /**
      * Scope a query to only include active products.
+     * @deprecated Use scopeActive() instead
      */
-    public function scopeEnabled($query)
+    public function scopeEnabled(Builder $query): Builder
     {
         return $query->where('status', 'active');
     }
 
     /**
      * Scope a query to search products by name or item code.
+     * 
+     * Usage: Product::search('tomato')->get()
      */
-    public function scopeSearch($query, string $search)
+    public function scopeSearch(Builder $query, string $search): Builder
     {
         return $query->where(function ($q) use ($search) {
             $q->where('name', 'like', "%{$search}%")
@@ -232,17 +241,18 @@ class Product extends Model
     }
 
     /**
-     * Scope a query to filter by category.
+     * Scope: By category
      */
-    public function scopeByCategory($query, int $categoryId)
+    public function scopeByCategory(Builder $query, int $categoryId): Builder
     {
         return $query->where('category_id', $categoryId);
     }
 
     /**
      * Scope a query to filter by product type.
+     * @deprecated Use scopeDaily() or scopeStandard() instead
      */
-    public function scopeByProductType($query, string $type)
+    public function scopeByProductType(Builder $query, string $type): Builder
     {
         return $query->where('product_type', $type);
     }
@@ -250,7 +260,7 @@ class Product extends Model
     /**
      * Scope a query to only include daily products.
      */
-    public function scopeDaily($query)
+    public function scopeDaily(Builder $query): Builder
     {
         return $query->where('product_type', 'daily');
     }
@@ -258,7 +268,7 @@ class Product extends Model
     /**
      * Scope a query to only include standard products.
      */
-    public function scopeStandard($query)
+    public function scopeStandard(Builder $query): Builder
     {
         return $query->where('product_type', 'standard');
     }
@@ -268,7 +278,7 @@ class Product extends Model
      * 
      * @deprecated Use scopeWithActiveDiscount() instead
      */
-    public function scopeWithDiscount($query)
+    public function scopeWithDiscount(Builder $query): Builder
     {
         return $this->scopeWithActiveDiscount($query);
     }
@@ -336,7 +346,7 @@ class Product extends Model
     /**
      * Scope a query to filter by stock status.
      */
-    public function scopeStockStatus($query, string $status)
+    public function scopeStockStatus(Builder $query, string $status): Builder
     {
         return match ($status) {
             'in_stock' => $query->where('stock_quantity', '>', 10),
@@ -345,6 +355,129 @@ class Product extends Model
             'out_of_stock' => $query->where('stock_quantity', '<=', 0),
             default => $query,
         };
+    }
+
+    /**
+     * Scope: Apply multiple filters at once
+     * 
+     * Usage: Product::filter($request->all())->get()
+     */
+    public function scopeFilter(Builder $query, array $filters): Builder
+    {
+        return $query
+            ->when($filters['search'] ?? null, function ($q, $search) {
+                $q->where(function ($query) use ($search) {
+                    $query->where('name', 'like', "%{$search}%")
+                          ->orWhere('item_code', 'like', "%{$search}%");
+                });
+            })
+            ->when($filters['category_id'] ?? null, function ($q, $categoryId) {
+                $q->where('category_id', $categoryId);
+            })
+            ->when($filters['status'] ?? null, function ($q, $status) {
+                $q->where('status', $status);
+            })
+            ->when($filters['product_type'] ?? null, function ($q, $type) {
+                $q->where('product_type', $type);
+            })
+            ->when(isset($filters['has_discount']), function ($q) use ($filters) {
+                return filter_var($filters['has_discount'], FILTER_VALIDATE_BOOLEAN)
+                    ? $q->withActiveDiscount()
+                    : $q->withoutActiveDiscount();
+            })
+            ->when($filters['stock_status'] ?? null, function ($q, $status) {
+                $q->stockStatus($status);
+            });
+    }
+
+    /**
+     * Scope: Active products only
+     * 
+     * Usage: Product::active()->get()
+     */
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('status', 'active');
+    }
+
+    /**
+     * Scope: Inactive products
+     */
+    public function scopeInactive(Builder $query): Builder
+    {
+        return $query->where('status', 'inactive');
+    }
+
+    /**
+     * Scope: Products in stock (quantity > 0)
+     */
+    public function scopeInStock(Builder $query): Builder
+    {
+        return $query->where('stock_quantity', '>', 0);
+    }
+
+    /**
+     * Scope: Products out of stock
+     */
+    public function scopeOutOfStock(Builder $query): Builder
+    {
+        return $query->where('stock_quantity', '<=', 0);
+    }
+
+    /**
+     * Scope: Products with low stock (0 < quantity <= 10)
+     */
+    public function scopeLowStock(Builder $query): Builder
+    {
+        return $query->where('stock_quantity', '>', 0)
+                     ->where('stock_quantity', '<=', 10);
+    }
+
+    /**
+     * Scope: Sort by common fields
+     * 
+     * Usage: Product::sortBy('price', 'asc')->get()
+     */
+    public function scopeSortBy(Builder $query, string $field = 'created_at', string $direction = 'desc'): Builder
+    {
+        $allowedFields = [
+            'name', 
+            'regular_price', 
+            'stock_quantity', 
+            'created_at', 
+            'updated_at'
+        ];
+
+        if (!in_array($field, $allowedFields)) {
+            $field = 'created_at';
+        }
+
+        $direction = strtolower($direction) === 'asc' ? 'asc' : 'desc';
+
+        return $query->orderBy($field, $direction);
+    }
+
+    /**
+     * Scope: With common relationships
+     * 
+     * Usage: Product::withRelations()->get()
+     */
+    public function scopeWithRelations(Builder $query): Builder
+    {
+        return $query->with([
+            'category:id,name,image',
+            'creator:id,name,email',
+            'updater:id,name,email',
+        ]);
+    }
+
+    /**
+     * Get stock status as string
+     */
+    public function getStockStatusAttribute(): string
+    {
+        return $this->stock_quantity > 10 ? 'in_stock' : 
+               ($this->stock_quantity > 0 ? 'low_stock' : 'out_of_stock');
     }
 
 }

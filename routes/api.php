@@ -36,17 +36,21 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index']);
 
     Route::prefix('categories')->middleware([\App\Http\Middleware\CheckCategory::class])->group(function () {
-        Route::get('/', [CategoryController::class, 'index']);
-        Route::post('/', [CategoryController::class, 'store']);
-        Route::post('/reorder', [CategoryController::class, 'reorder']);
-        Route::get('/search/{query}', [CategoryController::class, 'search']);
-        Route::get('/tree', [CategoryController::class, 'tree']);
+        Route::get('/', [CategoryController::class, 'index'])->name('categories.index');
+        Route::post('/list', [CategoryController::class, 'list'])->name('categories.list'); // POST /list (matches reference project pattern)
+        Route::post('/', [CategoryController::class, 'store'])->name('categories.store');
+        Route::post('/reorder', [CategoryController::class, 'reorder'])->name('categories.reorder');
+        Route::get('/search/{query}', [CategoryController::class, 'search'])->name('categories.search');
+        Route::get('/tree', [CategoryController::class, 'tree'])->name('categories.tree');
         Route::group(['prefix' => '/{category}'], function () {
-            Route::get('/', [CategoryController::class, 'show']);
-            Route::put('/', [CategoryController::class, 'update']);
-            Route::delete('/', [CategoryController::class, 'destroy']);
-            Route::post('/toggle-status', [CategoryController::class, 'toggleStatus']);
-            Route::get('/products', [CategoryController::class, 'products']);
+            Route::get('/', [CategoryController::class, 'show'])->name('categories.show');
+            Route::get('/detail', [CategoryController::class, 'detail'])->name('categories.detail'); // GET /detail (matches reference project pattern)
+            Route::put('/', [CategoryController::class, 'update'])->name('categories.update');
+            Route::post('/update', [CategoryController::class, 'update'])->name('categories.update.post'); // POST /update (matches reference project pattern)
+            Route::delete('/', [CategoryController::class, 'destroy'])->name('categories.destroy');
+            Route::post('/delete', [CategoryController::class, 'destroy'])->name('categories.delete.post'); // POST /delete (matches reference project pattern)
+            Route::post('/toggle-status', [CategoryController::class, 'toggleStatus'])->name('categories.toggle-status');
+            Route::get('/products', [CategoryController::class, 'products'])->name('categories.products');
         });
     });
 

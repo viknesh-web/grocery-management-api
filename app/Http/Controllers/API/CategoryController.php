@@ -10,10 +10,7 @@ use App\Http\Resources\Product\ProductCollection;
 use App\Http\Traits\HasImageUpload;
 use App\Http\Traits\HasStatusToggle;
 use App\Services\CategoryService;
-use App\Validator\CategoryValidator;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 
 class CategoryController extends Controller
 {
@@ -42,13 +39,21 @@ class CategoryController extends Controller
 
     public function store(Request $request)
     {
-        if ($request->has('is_active')) {
-            $request->merge(['is_active' => $request->boolean('is_active')]);
-        }
+        $datas = $request->all();
+
+        $flt_page = isset($datas['page']) ? intval($datas['page']) : 0;
+        $flt_limit = isset($datas['limit']) ? intval($datas['limit']) : 10;
+        $flt_sort = isset($datas['sort']) ? (strtoupper(trim($datas['sort'])) == 'DESC' ? 'DESC' : 'ASC') : 'ASC';
+        $flt_orderby = isset($datas['orderby']) ? trim($datas['orderby']) : 'name';
         
-        $validator = Validator::make($request->all(), CategoryValidator::onCreate());
-        $data = $validator->validate();
-        $data = DataNormalizer::normalizeCategory($data);
+        $filters = [
+            'status' => $request->get('status'),
+            'root' => $request->boolean('root'),
+            'parent_id' => $request->get('parent_id'),
+            'search' => $request->get('search'),
+            'sort_by' => $flt_orderby,
+            'sort_order' => strtolower($flt_sort),
+        ];
 
         try {
             $category = $this->categoryService->create($data, $request->file('image'), $request->user()->id);
@@ -70,7 +75,8 @@ class CategoryController extends Controller
 
     public function update(Request $request)
     {
-        $category = $request->get('category');
+        $data = $request->validated();
+        $category = $this->categoryService->create($data, $request->file('image'), $request->user()->id);
         
         if ($request->has('is_active')) {
             $request->merge(['is_active' => $request->boolean('is_active')]);

@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Exceptions\MessageException;
+use App\Exceptions\BusinessException;
 use App\Models\Category;
 use App\Models\Customer;
 use Illuminate\Http\UploadedFile;
@@ -52,7 +52,7 @@ class ImageService
             $disk->put($path, (string) $image->encode(), 'public');
 
             if (!$disk->exists($path)) {
-                throw new MessageException('Failed to store product image');
+                throw new BusinessException('Failed to upload image. Please try again.');
             }
         } catch (\Throwable $e) {
             report($e);
@@ -61,16 +61,16 @@ class ImageService
                 
                 // Verify the file was stored
                 if (!$disk->exists($path)) {
-                    throw new MessageException('Failed to store product image');
+                    throw new BusinessException('Failed to upload image. Please try again.');
                 }
             } catch (\Throwable $fallbackError) {
                 report($fallbackError);
-                throw new MessageException('Failed to store product image: ' . $fallbackError->getMessage());
+                    throw new BusinessException('Failed to upload image. Please try again.');
             }
         }
 
         if (!$disk->exists($path)) {
-            throw new MessageException('Product image was not saved correctly');
+            throw new BusinessException('Failed to upload image. Please try again.');
         }
 
         return $path;
@@ -97,7 +97,7 @@ class ImageService
 
             $media->put($path, (string) $image->encode(), 'public');
             if (!$media->exists($path)) {
-                throw new MessageException('Failed to store category image');
+                throw new BusinessException('Failed to upload image. Please try again.');
             }
         } catch (\Throwable $e) {
             report($e);
@@ -105,16 +105,16 @@ class ImageService
                 $media->putFileAs('category', $file, $filename, 'public');
 
                 if (!$media->exists($path)) {
-                    throw new MessageException('Failed to store category image');
+                    throw new BusinessException('Failed to upload image. Please try again.');
                 }
             } catch (\Throwable $fallbackError) {
                 report($fallbackError);
-                throw new MessageException('Failed to store category image: ' . $fallbackError->getMessage());
+                    throw new BusinessException('Failed to upload image. Please try again.');
             }
         }
 
         if (!$media->exists($path)) {
-            throw new MessageException('Category image was not saved correctly');
+            throw new BusinessException('Failed to upload image. Please try again.');
         }
 
         return $path;

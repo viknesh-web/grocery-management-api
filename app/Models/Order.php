@@ -26,6 +26,11 @@ class Order extends Model
         'updated_by',
     ];
 
+    protected $hidden = [
+        'created_by',
+        'updated_by',
+    ];
+
     protected $casts = [
         'order_date' => 'date',
         'delivery_date' => 'date',

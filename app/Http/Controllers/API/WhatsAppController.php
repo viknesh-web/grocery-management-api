@@ -187,6 +187,9 @@ class WhatsAppController extends Controller
             );
         }
 
+        // Check if async sending is requested (default: true)
+        $async = $request->boolean('async', true);
+
         $results = $this->whatsAppService->sendPriceListToCustomers(
             $customerIds,
             $message,
@@ -195,9 +198,20 @@ class WhatsAppController extends Controller
             $templateId,
             $contentVariables,
             $customPdfUrl,
-            $pdfLayout
+            $pdfLayout,
+            $async // Pass async flag
         );
 
+        // Handle async response
+        if (isset($results['status']) && $results['status'] === 'queued') {
+            return ApiResponse::success([
+                'queued' => true,
+                'customer_count' => $results['customer_count'],
+                'message' => $results['message'],
+            ], $results['message']);
+        }
+
+        // Handle synchronous response (existing code)
         $successCount = collect($results)->where('success', true)->count();
         $failureCount = count($results) - $successCount;
 
@@ -262,6 +276,9 @@ class WhatsAppController extends Controller
             }
         }
 
+        // Check if async sending is requested (default: true)
+        $async = $request->boolean('async', true);
+
         // Send to all active customers
         $results = $this->whatsAppService->sendPriceListToCustomers(
             null, // null means all active customers
@@ -269,9 +286,22 @@ class WhatsAppController extends Controller
             $includePdf,
             $productIds,
             $templateId,
-            $contentVariables
+            $contentVariables,
+            null, // customPdfUrl
+            'regular', // pdfLayout
+            $async // Pass async flag
         );
 
+        // Handle async response
+        if (isset($results['status']) && $results['status'] === 'queued') {
+            return ApiResponse::success([
+                'queued' => true,
+                'customer_count' => $results['customer_count'],
+                'message' => $results['message'],
+            ], $results['message']);
+        }
+
+        // Handle synchronous response (existing code)
         $successCount = collect($results)->where('success', true)->count();
         $failureCount = count($results) - $successCount;
 

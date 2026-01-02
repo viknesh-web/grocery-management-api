@@ -2,9 +2,11 @@
 
 namespace App\Services;
 
-use App\Exceptions\MessageException;
+use App\Exceptions\BusinessException;
 use App\Models\Product;
+use App\Services\CacheService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
@@ -13,6 +15,16 @@ class PdfService
 
     public function generatePriceList(array $productIds = [], string $pdfLayout = 'regular'): string
     {
+        $cacheKey = CacheService::priceListKey($productIds, $pdfLayout);
+        
+        // Check if PDF is already cached
+        $cachedPath = Cache::get($cacheKey);
+        if ($cachedPath && Storage::disk('media')->exists($cachedPath)) {
+            Log::info('Using cached price list PDF', ['path' => $cachedPath]);
+            return $cachedPath;
+        }
+
+        // Generate new PDF
         $query = Product::enabled()->with('category');
 
         if (!empty($productIds)) {
@@ -52,8 +64,11 @@ class PdfService
         $disk->put($path, $pdf->output(), 'public');
 
         if (!$disk->exists($path)) {
-            throw new MessageException('Failed to store price list PDF');
+            throw new BusinessException('Failed to generate PDF. Please try again.');
         }
+
+        // Cache the path for 1 hour
+        Cache::put($cacheKey, $path, CacheService::TTL_LONG);
 
         return $path;
     }

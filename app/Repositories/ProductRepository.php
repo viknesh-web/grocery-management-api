@@ -6,6 +6,7 @@ use App\Models\Product;
 use App\Services\ProductFilterService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Product Repository
@@ -14,9 +15,6 @@ use Illuminate\Database\Eloquent\Collection;
  */
 class ProductRepository
 {
-    public function __construct(
-        private ProductFilterService $filterService
-    ) {}
 
     /**
      * Get all products with optional filters and relations.
@@ -77,13 +75,9 @@ class ProductRepository
      */
     public function search(string $query, array $relations = []): Collection
     {
-        $builder = Product::query();
-
-        if (!empty($relations)) {
-            $builder->with($relations);
-        }
-
-        return $builder->search($query)->get();
+        return Product::search($query) // Use scope!
+            ->when(!empty($relations), fn($q) => $q->with($relations))
+            ->get();
     }
 
     /**
@@ -94,13 +88,13 @@ class ProductRepository
      */
     public function getEnabled(array $relations = []): Collection
     {
-        $query = Product::enabled();
-
-        if (!empty($relations)) {
-            $query->with($relations);
-        }
-
-        return $query->get();
+        $cacheKey = CacheService::productListKey(['status' => 'active']);
+        
+        return Cache::remember($cacheKey, CacheService::TTL_LONG, function () use ($relations) {
+            return Product::active() // Use scope!
+                ->when(!empty($relations), fn($q) => $q->with($relations))
+                ->get();
+        });
     }
 
     /**
@@ -114,7 +108,8 @@ class ProductRepository
      */
     public function getByCategory(int $categoryId, array $filters = [], int $perPage = 15, array $relations = []): LengthAwarePaginator
     {
-        $query = Product::where('category_id', $categoryId);
+        // Set category_id in filters to use the filter scope
+        $filters['category_id'] = $categoryId;
 
         if (!empty($relations)) {
             $query->with($relations);

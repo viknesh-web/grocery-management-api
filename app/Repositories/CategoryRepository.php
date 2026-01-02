@@ -5,6 +5,7 @@ namespace App\Repositories;
 use App\Models\Category;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Category Repository
@@ -94,21 +95,11 @@ class CategoryRepository
      */
     public function search(string $query, array $relations = []): Collection
     {
-        $builder = Category::query();
-        $builder->where('name', 'like', "%{$query}%");
-
-        if (!empty($relations)) {
-            $builder->with($relations);
-        }
-
-        $categories = $builder->orderBy('name', 'asc')->get();
-
-        $categories->transform(function ($category) {
-            $category->products_count = $category->products()->count();
-            return $category;
-        });
-
-        return $categories;
+        return Category::search($query) // Use scope!
+            ->when(!empty($relations), fn($q) => $q->with($relations))
+            ->withProductCount() // Use scope!
+            ->ordered()
+            ->get();
     }
 
     /**
@@ -119,13 +110,10 @@ class CategoryRepository
      */
     public function getRootCategories(array $relations = []): Collection
     {
-        $query = Category::active()->orderBy('name', 'asc');
-
-        if (!empty($relations)) {
-            $query->with($relations);
-        }
-
-        return $query->get();
+        return Category::active() // Use scope!
+            ->when(!empty($relations), fn($q) => $q->with($relations))
+            ->ordered()
+            ->get();
     }
 
     /**
@@ -136,13 +124,14 @@ class CategoryRepository
      */
     public function getActiveCategories(array $relations = []): Collection
     {
-        $query = Category::active();
-
-        if (!empty($relations)) {
-            $query->with($relations);
-        }
-
-        return $query->get();
+        $cacheKey = CacheService::categoryListKey(['status' => 'active']);
+        
+        return Cache::remember($cacheKey, CacheService::TTL_DAY, function () use ($relations) {
+            return Category::active() // Use scope!
+                ->when(!empty($relations), fn($q) => $q->with($relations))
+                ->ordered()
+                ->get();
+        });
     }
 
     /**

@@ -8,10 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Traits\HasStatusToggle;
 use App\Models\Customer;
 use App\Services\CustomerService;
-use App\Validator\CustomerValidator;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 
 class CustomerController extends Controller
 {
@@ -38,9 +35,8 @@ class CustomerController extends Controller
 
     public function store(Request $request)
     {
-        $validator = Validator::make($request->all(), CustomerValidator::onCreate(), CustomerValidator::messages());
-        $data = $validator->validate();
-        $data = DataNormalizer::normalizeCustomer($data);
+        $data = $request->validated();
+        $customer = $this->customerService->create($data, $request->user()->id);
 
         try {
             $customer = $this->customerService->create($data, $request->user()->id);
@@ -65,9 +61,7 @@ class CustomerController extends Controller
 
     public function update(Request $request, Customer $customer)
     {
-        $validator = Validator::make($request->all(), CustomerValidator::onUpdate($customer->id), CustomerValidator::messages());
-        $data = $validator->validate();
-        $data = DataNormalizer::normalizeCustomer($data, $customer->id);
+        $customer = $this->toggleModelStatus($customer, $this->customerService, $request->user()->id);
 
         try {
             $customer = $this->customerService->update($customer, $data, $request->user()->id);

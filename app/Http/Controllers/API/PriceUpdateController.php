@@ -102,6 +102,9 @@ class PriceUpdateController extends Controller
     {
         $limit = $request->get('limit', 50);
         $history = $this->priceUpdateService->getProductPriceHistory($product->id, $limit);
+        
+        // Load relationships if needed
+        $history->load('updater');
 
         return ApiResponse::success([
             'product' => $product,
@@ -123,6 +126,8 @@ class PriceUpdateController extends Controller
             $request->start_date,
             $request->end_date
         );
+        
+        $updates->load('product', 'updater');
 
         return ApiResponse::success($updates);
     }

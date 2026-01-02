@@ -93,6 +93,10 @@ class ProductService
             $this->createPriceUpdateRecord($product, null, $data, $userId);
 
             DB::commit();
+
+            // Clear product cache after creation
+            \App\Services\CacheService::clearProductCache();
+
             return $product;
         } catch (\Exception $e) {
             DB::rollBack();
@@ -181,6 +185,10 @@ class ProductService
             }
 
             DB::commit();
+
+            // Clear specific product and list caches
+            \App\Services\CacheService::clearProduct($product->id);
+
             return $product;
         } catch (\Exception $e) {
             DB::rollBack();
@@ -196,6 +204,8 @@ class ProductService
      */
     public function delete(Product $product): bool
     {
+        $productId = $product->id;
+        
         DB::beginTransaction();
         try {
             // Delete image if exists
@@ -206,6 +216,10 @@ class ProductService
             $result = $product->delete();
 
             DB::commit();
+
+            // Clear product cache
+            \App\Services\CacheService::clearProduct($productId);
+
             return $result;
         } catch (\Exception $e) {
             DB::rollBack();

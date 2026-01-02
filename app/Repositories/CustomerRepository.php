@@ -85,18 +85,9 @@ class CustomerRepository
      */
     public function search(string $query, array $relations = []): Collection
     {
-        $builder = Customer::query();
-
-        if (!empty($relations)) {
-            $builder->with($relations);
-        }
-
-        return $builder->where(function ($q) use ($query) {
-            $q->where('name', 'like', '%' . $query . '%')
-              ->orWhere('whatsapp_number', 'like', '%' . $query . '%')
-              ->orWhere('address', 'like', '%' . $query . '%')
-              ->orWhere('landmark', 'like', '%' . $query . '%');
-        })->get();
+        return Customer::search($query) // Use scope!
+            ->when(!empty($relations), fn($q) => $q->with($relations))
+            ->get();
     }
 
     /**
@@ -107,13 +98,9 @@ class CustomerRepository
      */
     public function getActive(array $relations = []): Collection
     {
-        $query = Customer::where('status', 'active');
-
-        if (!empty($relations)) {
-            $query->with($relations);
-        }
-
-        return $query->get();
+        return Customer::active() // Use scope!
+            ->when(!empty($relations), fn($q) => $q->with($relations))
+            ->get();
     }
 }
 

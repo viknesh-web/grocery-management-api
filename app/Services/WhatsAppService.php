@@ -31,12 +31,10 @@ class WhatsAppService
         $this->whatsappNumber = $whatsappNumber;
     }
 
-    public function sendPriceListToCustomers(?array $customerIds = null, ?string $customMessage = null, bool $includePdf = true, ?array $productIds = null, ?string $templateId = null, ?array $contentVariables = null, ?string $customPdfUrl = null, string $pdfLayout = 'regular'): array
+    public function sendPriceListToCustomers(?array $customerIds = null, ?string $customMessage = null, bool $includePdf = true, ?array $productIds = null, ?string $templateId = null, ?array $contentVariables = null, ?string $customPdfUrl = null, string $pdfLayout = 'regular', bool $async = true): array
     {
-        $results = [];
-        $pdfUrl = null;
-        
         // Generate PDF if needed
+        $pdfUrl = null;
         if ($includePdf) {
             if ($customPdfUrl !== null) {
                 // Use custom uploaded PDF
