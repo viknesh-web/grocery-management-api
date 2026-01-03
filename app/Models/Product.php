@@ -25,13 +25,9 @@ class Product extends Model
         'stock_unit',
         'status',
         'product_type',
-        'created_by',
-        'updated_by',
     ];
 
     protected $hidden = [
-        'created_by',
-        'updated_by',
         'deleted_at',
     ];
 
@@ -76,22 +72,7 @@ class Product extends Model
     {
         return $this->belongsTo(Category::class);
     }
-
-    /**
-     * Get the user who created this product.
-     */
-    public function creator(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'created_by');
-    }
-
-    /**
-     * Get the user who last updated this product.
-     */
-    public function updater(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'updated_by');
-    }
+ 
 
     /**
      * Get all price updates for this product.

@@ -144,29 +144,73 @@ class OrderFormController extends Controller
         try {
             $data = $request->validated();
             
+            // Get products from session
+            $products = session('review_products');
+            if (!$products || (is_countable($products) && count($products) === 0)) {
+                if ($request->wantsJson() || $request->ajax() || $request->expectsJson()) {
+                    return response()->json([
+                        'status' => false,
+                        'message' => 'No products selected. Please select products first.',
+                    ], 400);
+                }
+                return redirect()->route('order.form')->with('error', 'No products selected');
+            }
+            
+            // Prepare order data
+            $orderData = [
+                'customer_name' => $data['customer_name'],
+                'customer_email' => $data['email'] ?? null,
+                'customer_phone' => $data['whatsapp'],
+                'customer_address' => $data['address'],
+                'products' => is_countable($products) ? $products : $products->toArray(),
+                'grand_total' => $data['grand_total'],
+                'subtotal' => session('order_subtotal', $data['grand_total']),
+                'notes' => $request->notes ?? null,
+            ];
+            
+            // Create order in database
+            $order = $this->orderService->createFromWebForm($orderData);
+            
+            // Clear session
             $this->orderService->clearSession();
-            $this->orderService->saveConfirmationToSession($data);
-
-            // Handle JSON/AJAX requests
+            session()->forget(['order_subtotal']);
+            
+            // Store for confirmation page
+            $this->orderService->saveConfirmationToSession([
+                'order_number' => $order->order_number,
+                'customer_name' => $order->customer_name,
+                'total_amount' => $order->total_amount,
+                'order_id' => $order->id,
+            ]);
+            
             if ($request->wantsJson() || $request->ajax() || $request->expectsJson()) {
                 return response()->json([
                     'status' => true,
-                    'data' => $data,
+                    'data' => [
+                        'order_number' => $order->order_number,
+                        'order_id' => $order->id,
+                    ],
                     'redirect_url' => route('order.confirmation.show'),
                 ]);
             }
 
-            return view('order.confirmation', compact('data'));
+            return redirect()->route('order.confirmation.show');
+            
         } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Order creation failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            
             if ($request->wantsJson() || $request->ajax() || $request->expectsJson()) {
                 return response()->json([
                     'status' => false,
-                    'message' => 'Unable to confirm order. Please try again.',
+                    'message' => 'Failed to create order. Please try again.',
                 ], 500);
             }
-
+            
             return redirect()->back()
-                ->with('error', 'Unable to confirm order. Please try again.')
+                ->with('error', 'Failed to create order. Please try again.')
                 ->withInput();
         }
     }
