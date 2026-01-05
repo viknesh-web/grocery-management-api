@@ -5,6 +5,7 @@ use App\Http\Controllers\API\AuthController;
 use App\Http\Controllers\API\CategoryController;
 use App\Http\Controllers\API\CustomerController;
 use App\Http\Controllers\API\DashboardController;
+use App\Http\Controllers\API\OrderController;
 use App\Http\Controllers\API\PriceUpdateController;
 use App\Http\Controllers\API\ProductController;
 use App\Http\Controllers\API\WhatsAppController;
@@ -84,7 +85,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::post('/whatsapp/send-message', [WhatsAppController::class, 'sendMessage']);
     Route::post('/whatsapp/send-product-update', [WhatsAppController::class, 'sendProductUpdate']);
     Route::post('/whatsapp/test-message/{customer}', [WhatsAppController::class, 'sendTestMessage'])->middleware(\App\Http\Middleware\CheckCustomer::class);
-    Route::post('/whatsapp/validate-number', [WhatsAppController::class, 'validateNumber']);
+    Route::post('/whatsapp/validate-number', [WhatsAppController::class, 'validateNumber']);   
 
 });
 

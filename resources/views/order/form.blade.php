@@ -1,10 +1,17 @@
+
 <!DOCTYPE html>
 <html>
 <head>
     <title>Order Form</title>
+    <script>
+        window.UNIT_CONVERSIONS = @json($unitConversions ?? []);
+    </script>
 </head>
 <body>
-    @vite(['resources/css/pages/orderform/index.css'])
+    @vite([
+        'resources/js/pages/orderform/index.js',
+        'resources/css/pages/orderform/index.css'
+    ])
     <div class="order-wrapper">
         <div class="" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
             <div class="header" style="text-align: left ; margin-left: 20px;">
@@ -126,18 +133,19 @@
     <table style="display:none">
         <tbody id="allProducts">
             @foreach($products as $product)
-            @php $price = $product->selling_price ?? $product->original_price; @endphp
+            @php $price = $product->selling_price ?? $product->regular_price; @endphp
             <tr data-category="{{ $product->category_id }}">
                 <td class="product-image">
                     <img src="{{ $product->image_url }}">
                 </td>
                 <td>{{ $product->name }}</td>
                 <td class="item-code">{{ $product->item_code }}</td>
+               
                 <td>
-                    @if(!empty($product->selling_price) && $product->selling_price < $product->original_price)
+                    @if(!empty($product->selling_price) && $product->selling_price < $product->regular_price)
                         <div class="original-price">
                             <img src="{{ asset('assets/images/Dirham-Symbol-grey.png') }}" width="10">
-                            {{ number_format($product->original_price, 2) }}
+                            {{ number_format($product->regular_price, 2) }}
                         </div>
                         <div class="selling-price">
                             <img src="{{ asset('assets/images/Dirham-Symbol.png') }}" width="10">
@@ -147,18 +155,33 @@
                         @else
                         <div class="selling-price">
                             <img src="{{ asset('assets/images/Dirham-Symbol.png') }}" width="10">
-                            {{ number_format($product->original_price, 2) }} / {{ $product->stock_unit }}
+                            {{ number_format($product->regular_price, 2) }} / {{ $product->stock_unit }}
                         </div>
-                        <input type="hidden" class="price-value" value="{{ $product->original_price }}">
+                        <input type="hidden" class="price-value" value="{{ $product->regular_price }}">
                         @endif
                 </td>
                 <td>
-                    <input type="number" min="0" class="qty"
-                        name="products[{{ $product->id }}][qty]"
-                        value="{{ $selectedQty[$product->id]['qty'] ?? '' }}">
-                    <input type="hidden"
-                        name="products[{{ $product->id }}][name]"
-                        value="{{ $product->name }}">
+                    <div style="display: flex; gap: 5px; align-items: center;">
+                        <input type="number" 
+                            step="0.01"
+                            min="0" 
+                            class="qty"
+                            name="products[{{ $product->id }}][qty]"
+                            value="{{ $selectedQty[$product->id]['qty'] ?? '' }}"
+                            style="width: 60px;">
+                        
+                        <select name="products[{{ $product->id }}][unit]" 
+                                class="unit-select"
+                                data-base-unit="{{ $product->stock_unit }}"
+                                style="width: 70px; padding: 6px;">
+                            @foreach($product->getAvailableUnits() as $unit)
+                                <option value="{{ $unit }}" 
+                                    {{ ($selectedQty[$product->id]['unit'] ?? $product->stock_unit) === $unit ? 'selected' : '' }}>
+                                    {{ $unit }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
                 </td>
                 <td>
                     <img src="{{ asset('assets/images/Dirham-Symbol-grey.png') }}" width="12">

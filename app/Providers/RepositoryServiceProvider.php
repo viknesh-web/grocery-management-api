@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Repositories\CategoryRepository;
 use App\Repositories\CustomerRepository;
+use App\Repositories\OrderItemRepository;
 use App\Repositories\OrderRepository;
 use App\Repositories\PriceUpdateRepository;
 use App\Repositories\ProductRepository;
@@ -64,6 +65,7 @@ class RepositoryServiceProvider extends ServiceProvider
         $this->app->bind(CategoryRepository::class);
         $this->app->bind(CustomerRepository::class);
         $this->app->bind(OrderRepository::class);
+        $this->app->bind(OrderItemRepository::class);
         $this->app->bind(PriceUpdateRepository::class);
     }
 

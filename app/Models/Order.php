@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,10 +19,8 @@ class Order extends Model
         'delivery_date',
         'subtotal',
         'discount_amount',
-        'tax_amount',
-        'total_amount',
+        'total',
         'status',
-        'notes',
         'created_by',
         'updated_by',
     ];
@@ -36,8 +35,8 @@ class Order extends Model
         'delivery_date' => 'date',
         'subtotal' => 'decimal:2',
         'discount_amount' => 'decimal:2',
-        'tax_amount' => 'decimal:2',
-        'total_amount' => 'decimal:2',
+        'total' => 'decimal:2',
+        'status' => 'string',
     ];
 
     /**
@@ -70,6 +69,65 @@ class Order extends Model
     public function updater(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    /**
+     * Scope: Apply multiple filters
+     */
+    public function scopeFilter(Builder $query, array $filters): Builder
+    {
+        return $query
+            ->when($filters['search'] ?? null, function ($q, $search) {
+                $q->where(function ($query) use ($search) {
+                    $query->where('order_number', 'like', "%{$search}%")
+                          ->orWhere('customer_name', 'like', "%{$search}%")
+                          ->orWhere('customer_email', 'like', "%{$search}%")
+                          ->orWhere('customer_phone', 'like', "%{$search}%")
+                          ->orWhereHas('customer', function ($q) use ($search) {
+                              $q->where('name', 'like', "%{$search}%");
+                          });
+                });
+            })
+            ->when($filters['status'] ?? null, fn($q, $status) => 
+                $q->where('status', $status))
+            ->when($filters['customer_id'] ?? null, fn($q, $customerId) => 
+                $q->where('customer_id', $customerId))
+            ->when($filters['date_from'] ?? null, fn($q, $date) => 
+                $q->whereDate('order_date', '>=', $date))
+            ->when($filters['date_to'] ?? null, fn($q, $date) => 
+                $q->whereDate('order_date', '<=', $date));
+    }
+
+    /**
+     * Scope: Recent orders
+     */
+    public function scopeRecent(Builder $query, int $limit = 10): Builder
+    {
+        return $query->orderBy('created_at', 'desc')->limit($limit);
+    }
+
+    /**
+     * Scope: Filter by status
+     */
+    public function scopeByStatus(Builder $query, string $status): Builder
+    {
+        return $query->where('status', $status);
+    }
+
+    /**
+     * Scope: Pending orders
+     */
+    public function scopePending(Builder $query): Builder
+    {
+        return $query->where('status', 'pending');
+    }
+
+    /**
+     * Scope: Completed orders
+     */
+    public function scopeCompleted(Builder $query): Builder
+    {
+        return $query->where('status', 'completed');
     }
 }
 

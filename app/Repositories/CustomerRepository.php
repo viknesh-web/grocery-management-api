@@ -24,8 +24,6 @@ class CustomerRepository extends BaseRepository
 {
     /**
      * Get the model class name.
-     *
-     * @return string
      */
     protected function model(): string
     {
@@ -33,9 +31,7 @@ class CustomerRepository extends BaseRepository
     }
 
     /**
-     * Get default sort column for customers.
-     *
-     * @return string
+     * Get default sort column for customers.  
      */
     protected function getDefaultSortColumn(): string
     {
@@ -44,8 +40,6 @@ class CustomerRepository extends BaseRepository
 
     /**
      * Get default sort order for customers.
-     *
-     * @return string
      */
     protected function getDefaultSortOrder(): string
     {
@@ -233,5 +227,10 @@ class CustomerRepository extends BaseRepository
     public function getSingleCacheKey(int $id): string
     {
         return CacheService::customerKey($id);
+    }
+
+    public function findByPhone(string $phone): ?Customer
+    {
+        return Customer::where('whatsapp_number', $phone)->first();
     }
 }

@@ -245,7 +245,6 @@ $generatedAt = Carbon::now();
                                 } else {
                                     $imagePath = '';
                                 }
-                                print_r($imagePath);
                             @endphp
                             <tr>
                                 <td class="item-name">{{ $item->name }}</td>
@@ -255,8 +254,8 @@ $generatedAt = Carbon::now();
                                 </td>
                                 <td class="item-code"> @foreach(str_split($item->item_code, 14) as $chunk){{ $chunk }}<br>@endforeach</td>
                                 <td class="price-cell">
-                                    @if($item->original_price > $item->selling_price)
-                                    <span class="old-price"><img src="{{ public_path('assets/images/Dirham-Symbol-grey.png') }}" width="8"> {{ number_format($item->original_price,2) }}</span><br>
+                                    @if($item->regular_price > $item->selling_price)
+                                    <span class="old-price"><img src="{{ public_path('assets/images/Dirham-Symbol-grey.png') }}" width="8"> {{ number_format($item->regular_price,2) }}</span><br>
                                     @endif
                                     <span class="new-price"><img src="{{ public_path('assets/images/Dirham-Symbol.png') }}" width="8"> {{ number_format($item->selling_price,2) }}</span>
                                 </td>
@@ -302,8 +301,8 @@ $generatedAt = Carbon::now();
                                 </td>
                                 <td class="item-code">@foreach(str_split($item->item_code, 14) as $chunk){{ $chunk }}<br>@endforeach</td>
                                 <td class="price-cell">
-                                    @if($item->original_price > $item->selling_price)
-                                    <span class="old-price"><img src="{{ public_path('assets/images/Dirham-Symbol-grey.png') }}" width="8"> {{ number_format($item->original_price,2) }}</span><br>
+                                    @if($item->regular_price > $item->selling_price)
+                                    <span class="old-price"><img src="{{ public_path('assets/images/Dirham-Symbol-grey.png') }}" width="8"> {{ number_format($item->regular_price,2) }}</span><br>
                                     @endif
                                     <span class="new-price"><img src="{{ public_path('assets/images/Dirham-Symbol.png') }}" width="8"> {{ number_format($item->selling_price,2) }}</span>
                                 </td>

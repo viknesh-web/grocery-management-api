@@ -44,13 +44,13 @@ class ProductService extends BaseService
      */
     public function getPaginated(array $filters = [], int $perPage = 15): \Illuminate\Contracts\Pagination\LengthAwarePaginator
     {
-        $relations = ['creator:id,name,email', 'updater:id,name,email', 'category:id,name'];
+        $relations = ['category:id,name'];
         
         // Get paginated products via repository
         $products = $this->repository->paginate($filters, $perPage, $relations);
 
         // Get filter metadata using repository's count method
-        // This ensures we use the same filter logic as the pagination
+        // This ensures we use the same filter logic as the pagination 
         $totalFiltered = $this->repository->countByFilters($filters);
         $filtersApplied = array_filter($filters, fn($value) => !empty($value));
 
@@ -281,17 +281,7 @@ class ProductService extends BaseService
         $discountType = $data['discount_type'] ?? $product?->discount_type ?? 'none';
         if ($discountType === 'none') {
             $data['discount_value'] = null;
-        }
-
-        // Add user tracking
-        if ($product === null) {
-            // Creating new product
-            $data['created_by'] = $userId;
-            $data['updated_by'] = $userId;
-        } else {
-            // Updating existing product
-            $data['updated_by'] = $userId;
-        }
+        }        
 
         return $data;
     }
