@@ -278,6 +278,11 @@ class CategoryRepository extends BaseRepository
         return $this->buildQuery($filters)->count();
     }
 
+    public function getNameAndProductCount(array $filters = [])
+    {
+        return $this->buildQuery($filters)->withCount('products')->select(['id', 'name', 'image as image_url'])->get();
+    }
+
     /**
      * Get cache key for category list.
      * 

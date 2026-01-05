@@ -106,10 +106,14 @@ class DashboardService
      */
     protected function getCategoryStatistics(): array
     {
+        $category = $this->categoryRepository->all();
+        $categoryproduct = $this->categoryRepository->getNameAndProductCount();
         $totalCategories = $this->categoryRepository->count();
         $activeCategories = $this->categoryRepository->countByFilters(['status' => 'active']);
 
         return [
+            'data' => $category,
+            'product' => $categoryproduct,
             'total' => $totalCategories,
             'active' => $activeCategories,
             'inactive' => $totalCategories - $activeCategories,

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\API\AddressController;
 use App\Http\Controllers\Web\OrderFormController;
 use Illuminate\Support\Facades\Route;
 
@@ -9,4 +10,4 @@ Route::post('/order-review', [OrderFormController::class, 'review'])->name('orde
 Route::post('/order/confirmation', [OrderFormController::class, 'confirm'])->name('order.confirmation');
 Route::get('/order/confirmation', [OrderFormController::class, 'showConfirmation'])->name('order.confirmation.show');
 Route::get('/order-review', [OrderFormController::class, 'showReview'])     ->name('order.review.show');
-Route::get('/geoapify/address', [OrderFormController::class, 'geoapifyAddress']);
+Route::get('/geoapify/address', [AddressController::class, 'searchUAE']);
