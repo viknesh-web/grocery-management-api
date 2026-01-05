@@ -140,7 +140,7 @@
                         <td>{{ $product->item_code }}</td>
                         <td>
                             @if($product->has_discount)
-                                <span class="original-price">₹{{ number_format($product->original_price, 2) }}</span>
+                                <span class="original-price">₹{{ number_format($product->regular_price, 2) }}</span>
                                 <span class="price">₹{{ number_format($product->selling_price, 2) }}</span>
                                 <div class="discount-info">
                                     @if($product->discount_type === 'percentage')
@@ -150,7 +150,7 @@
                                     @endif
                                 </div>
                             @else
-                                <span class="price">₹{{ number_format($product->original_price, 2) }}</span>
+                                <span class="price">₹{{ number_format($product->regular_price, 2) }}</span>
                             @endif
                         </td>
                         <td>{{ number_format($product->stock_quantity, 2) }}</td>

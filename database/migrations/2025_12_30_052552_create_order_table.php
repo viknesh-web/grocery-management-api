@@ -19,10 +19,8 @@ return new class extends Migration
             $table->date('delivery_date')->nullable();
             $table->decimal('subtotal', 10, 2)->unsigned();
             $table->decimal('discount_amount', 10, 2)->default(0)->unsigned();
-            $table->decimal('tax_amount', 10, 2)->default(0)->unsigned();
-            $table->decimal('total_amount', 10, 2)->unsigned();
-            $table->enum('status', ['pending', 'confirmed', 'processing', 'delivered', 'cancelled'])->default('pending');            
-            $table->text('notes')->nullable();
+            $table->decimal('total', 10, 2)->unsigned();
+            $table->enum('status', ['pending', 'confirmed', 'processing', 'delivered', 'cancelled'])->default('pending');
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
             $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();

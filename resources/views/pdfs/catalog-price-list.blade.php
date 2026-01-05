@@ -337,7 +337,7 @@
                             <div>
                             @if($product->discount_price > 0)
                                 <div class="original-price">
-                                     <img src="{{ public_path('assets/images/symbol.png') }}" width="8"> {{ number_format($product->original_price, 2) }}
+                                     <img src="{{ public_path('assets/images/symbol.png') }}" width="8"> {{ number_format($product->regular_price, 2) }}
                                 </div>
                             @endif
  

@@ -56,9 +56,9 @@
                     $relativePath = str_replace(url('/media').'/', '', $item->image_url);
                     $imagePath = Storage::disk('media')->path($relativePath);
                 }
-                $price = ($item->selling_price > 0 && $item->selling_price < $item->original_price)
+                $price = ($item->selling_price > 0 && $item->selling_price < $item->regular_price)
                 ? $item->selling_price
-                : $item->original_price;
+                : $item->regular_price;
                 $rowTotal = $price * $item->qty;
                 $grandTotal += $rowTotal;
                 @endphp
@@ -73,11 +73,11 @@
                     </td>
                     <td>{{ $item->item_code }}</td>
                     <td>
-                        @if($item->selling_price > 0 && $item->selling_price < $item->original_price)
-                            <div class="old-price"><img src="file://{{ public_path('assets/images/Dirham-Symbol-grey.png') }}" width="10"> {{ number_format($item->original_price,2) }} / {{ $item->stock_unit }}</div>
+                        @if($item->selling_price > 0 && $item->selling_price < $item->regular_price)
+                            <div class="old-price"><img src="file://{{ public_path('assets/images/Dirham-Symbol-grey.png') }}" width="10"> {{ number_format($item->regular_price,2) }} / {{ $item->stock_unit }}</div>
                             <div class="new-price"><img src="file://{{ public_path('assets/images/Dirham-Symbol.png') }}" width="10"> {{ number_format($item->selling_price,2) }} / {{ $item->stock_unit }}</div>
                             @else
-                            <div class="new-price"><img src="file://{{ public_path('assets/images/Dirham-Symbol.png') }}" width="10"> {{ number_format($item->original_price,2) }} / {{ $item->stock_unit }}</div>
+                            <div class="new-price"><img src="file://{{ public_path('assets/images/Dirham-Symbol.png') }}" width="10"> {{ number_format($item->regular_price,2) }} / {{ $item->stock_unit }}</div>
                         @endif
                     </td>
                     <td>{{ $item->qty }}</td>

@@ -37,7 +37,7 @@ class OrderItemRepository
      */
     public function createMultiple(int $orderId, array $items): Collection
     {
-        $orderItems = collect();
+        $orderItems = new Collection();
         
         foreach ($items as $itemData) {
             $itemData['order_id'] = $orderId;
@@ -100,4 +100,5 @@ class OrderItemRepository
         return $orderItem->delete();
     }
 }
+
 

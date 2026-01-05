@@ -15,20 +15,12 @@ class Order extends Model
     protected $fillable = [
         'order_number',
         'customer_id',
-        'customer_name',
-        'customer_email',
-        'customer_phone',
-        'customer_address',
         'order_date',
         'delivery_date',
         'subtotal',
         'discount_amount',
-        'tax_amount',
-        'total_amount',
+        'total',
         'status',
-        'payment_status',
-        'notes',
-        'admin_notes',
         'created_by',
         'updated_by',
     ];
@@ -43,10 +35,8 @@ class Order extends Model
         'delivery_date' => 'date',
         'subtotal' => 'decimal:2',
         'discount_amount' => 'decimal:2',
-        'tax_amount' => 'decimal:2',
-        'total_amount' => 'decimal:2',
+        'total' => 'decimal:2',
         'status' => 'string',
-        'payment_status' => 'string',
     ];
 
     /**
@@ -100,8 +90,6 @@ class Order extends Model
             })
             ->when($filters['status'] ?? null, fn($q, $status) => 
                 $q->where('status', $status))
-            ->when($filters['payment_status'] ?? null, fn($q, $paymentStatus) => 
-                $q->where('payment_status', $paymentStatus))
             ->when($filters['customer_id'] ?? null, fn($q, $customerId) => 
                 $q->where('customer_id', $customerId))
             ->when($filters['date_from'] ?? null, fn($q, $date) => 

@@ -54,20 +54,11 @@ class OrderService
 
     /**
      * Get form data for order form.
-     * 
-     * Handles:
-     * - Product retrieval (via ProductRepository)
-     * - Category retrieval (via CategoryRepository)
-     * - Relation eager loading
-     *
-     * @return array Form data with products and categories
      */
     public function getFormData(): array
     {
-        // Get enabled products with categories (business logic - data retrieval via repository)
         $products = $this->productRepository->getActive(['category']);
 
-        // Get categories ordered by name (business logic - data retrieval via repository)
         $categories = $this->categoryRepository->all([], [])
             ->sortBy('name')
             ->values();
@@ -77,6 +68,7 @@ class OrderService
             'categories' => $categories,
         ];
     }
+    
 
     /**
      * Process products for review.
@@ -246,192 +238,230 @@ class OrderService
      * Create order from web form submission.
      *
      * @param array $data Order data with customer info and products
-     * @param int|null $userId User ID if created by admin
      * @return Order
      */
-    public function createFromWebForm(array $data, ?int $userId = null): Order
+    public function createFromWebForm(array $data): Order
     {
+      
         DB::beginTransaction();
+        
         try {
-            // Step 1: Find or create customer
+            Log::info('Order creation started', [
+                'customer_name' => $data['customer_name'],
+                'product_count' => count($data['products'])
+            ]);
+            
+           
             $customer = $this->findOrCreateCustomer($data);
             
-            // Step 2: Generate order number
+           
             $orderNumber = $this->orderRepository->generateOrderNumber();
             
-            // Step 3: Prepare order data
+         
+            $totals = $this->calculateOrderTotals($data['products']);
+        
             $orderData = [
                 'order_number' => $orderNumber,
-                'customer_id' => $customer?->id,
-                'customer_name' => $data['customer_name'] ?? $customer?->name,
-                'customer_email' => $data['customer_email'] ?? $data['email'] ?? null,
-                'customer_phone' => $data['customer_phone'] ?? $data['whatsapp'] ?? $customer?->whatsapp_number,
-                'customer_address' => $data['customer_address'] ?? $data['address'] ?? $customer?->address,
+                'customer_id' => $customer?->id,               
                 'order_date' => now()->toDateString(),
-                'subtotal' => $data['subtotal'] ?? 0,
-                'discount_amount' => $data['discount_amount'] ?? 0,
-                'tax_amount' => $data['tax_amount'] ?? 0,
-                'total_amount' => $data['grand_total'] ?? $data['total_amount'] ?? 0,
+                'subtotal' => $totals['subtotal'],
+                'discount_amount' => $totals['discount_amount'],
+                'total' => $data['grand_total'],
                 'status' => 'pending',
-                'payment_status' => 'unpaid',
-                'notes' => $data['notes'] ?? null,
-                'created_by' => $userId,
-                'updated_by' => $userId,
             ];
             
-            // Step 4: Create order
+            // REPOSITORY: Create order ✓
             $order = $this->orderRepository->create($orderData);
             
-            // Step 5: Prepare and create order items
-            $items = $this->prepareOrderItems($data['products'] ?? []);
+            Log::info(' ORDER CREATED', ['order_id' => $order->id]);
+            
+            // BUSINESS LOGIC: Prepare order items
+            $items = $this->prepareOrderItems($data['products']);
+            
+            // REPOSITORY: Create order items ✓
             $this->orderItemRepository->createMultiple($order->id, $items);
             
-            // Step 6: Reload order with relationships
-            $order = $this->orderRepository->find($order->id, ['items', 'customer']);
+            Log::info(' ORDER ITEMS CREATED', ['count' => count($items)]);
             
+            // BUSINESS LOGIC: Commit transaction
             DB::commit();
             
-            Log::info('Order created successfully', [
+            Log::info(' ORDER SAVED', [
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,
-                'customer_id' => $customer?->id,
             ]);
             
             return $order;
             
         } catch (\Exception $e) {
+            // BUSINESS LOGIC: Rollback on error
             DB::rollBack();
-            Log::error('Failed to create order', [
+            Log::error('ORDER FAILED', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'line' => $e->getLine(),
+                'file' => $e->getFile()
             ]);
             throw $e;
         }
     }
 
     /**
-     * Find existing customer or create new one.
+     * Find or create customer from order data.
      *
      * @param array $data
      * @return Customer|null
      */
     private function findOrCreateCustomer(array $data): ?Customer
     {
-        // 1. Check if customer_id provided
-        if (isset($data['customer_id']) && $data['customer_id']) {
-            return $this->customerRepository->find($data['customer_id']);
+        $phone = $data['customer_phone'];
+        
+        // REPOSITORY: Find by phone
+        $customer = $this->customerRepository->findByPhone($phone);
+        
+        if ($customer) {
+            return $customer;
         }
         
-        // 2. Try to find by phone
-        $phone = $data['customer_phone'] ?? $data['whatsapp'] ?? null;
-        if ($phone) {
-            $normalizedPhone = PhoneNumberHelper::normalize($phone);
-            $customers = $this->customerRepository->search($normalizedPhone);
-            $customer = $customers->firstWhere('whatsapp_number', $normalizedPhone);
-            if ($customer) {
-                return $customer;
-            }
-        }
+        // BUSINESS LOGIC: Prepare customer data
+        $customerData = [
+            'name' => $data['customer_name'],
+            'whatsapp_number' => $phone,
+            'email' => $data['customer_email'],
+            'address' => $data['customer_address'],
+            'status' => 'active',
+        ];
         
-        // 3. Create new customer if we have required data
-        $name = $data['customer_name'] ?? null;
-        if ($name && $phone) {
-            try {
-                $customerData = [
-                    'name' => trim($name),
-                    'whatsapp_number' => PhoneNumberHelper::normalize($phone),
-                    'address' => $data['customer_address'] ?? $data['address'] ?? null,
-                    'remarks' => 'Auto-created from web order',
-                    'status' => 'active',
-                ];
-                
-                return $this->customerRepository->create($customerData);
-            } catch (\Exception $e) {
-                Log::warning('Failed to auto-create customer', [
-                    'error' => $e->getMessage(),
-                    'data' => $data
-                ]);
-            }
-        }
-        
-        // Return null for guest order
-        return null;
+        // REPOSITORY: Create customer
+        return $this->customerRepository->create($customerData);
     }
 
     /**
-     * Prepare order items data from products.
+     * Calculate order totals from products.
+     * Handles both array and object product data.
      *
-     * @param array $products
-     * @return array
+     * @param mixed $products Array or Collection of products
+     * @return array ['subtotal' => float, 'discount_amount' => float]
      */
-    private function prepareOrderItems(array $products): array
+    private function calculateOrderTotals($products): array
+    {
+        $subtotal = 0;
+        $discountAmount = 0;
+        
+        // Convert to array if it's a collection
+        if ($products instanceof Collection) {
+            $products = $products->toArray();
+        }
+        
+        foreach ($products as $product) {
+            // Handle both array and object access
+            $price = $this->getProductPrice($product);
+            $qty = $this->getProductQuantity($product);
+            
+            $subtotal += ($price * $qty);
+        }
+        
+        return [
+            'subtotal' => $subtotal,
+            'discount_amount' => $discountAmount,
+        ];
+    }
+
+    /**
+     * Prepare order items from products.
+     * Handles both array and object product data.
+     *
+     * @param mixed $products Array or Collection of products
+     * @return array Array of order items
+     */
+    private function prepareOrderItems($products): array
     {
         $items = [];
         
-        foreach ($products as $productId => $productData) {
-            // Handle both array formats:
-            // 1. [$productId => ['qty' => 2]]
-            // 2. [['product_id' => 1, 'qty' => 2]]
+        // Convert to array if it's a collection
+        if ($products instanceof Collection) {
+            $products = $products->toArray();
+        }
+        
+        foreach ($products as $product) {
+            $qty = $this->getProductQuantity($product);
             
-            if (is_array($productData) && isset($productData['product_id'])) {
-                $productId = $productData['product_id'];
-            }
+            if ($qty <= 0) continue;
             
-            // Skip if no quantity
-            $qty = $productData['qty'] ?? $productData['quantity'] ?? 0;
-            if ($qty <= 0) {
-                continue;
-            }
-            
-            // Get product details
-            $product = $this->productRepository->find((int) $productId);
-            if (!$product) {
-                Log::warning('Product not found for order item', ['product_id' => $productId]);
-                continue;
-            }
-            
-            $quantity = (float) $qty;
-            $price = (float) ($productData['price'] ?? $product->selling_price ?? $product->regular_price);
-            $subtotal = $quantity * $price;
-            
-            // Calculate discount
-            $discountAmount = 0;
-            $discountType = 'none';
-            $discountValue = 0;
-            
-            // Check if product has active discount
-            if ($product->has_discount ?? false) {
-                $activeDiscount = $product->activeDiscount();
-                if ($activeDiscount) {
-                    $discountType = $activeDiscount->discount_type;
-                    $discountValue = (float) $activeDiscount->discount_value;
-                    
-                    if ($discountType === 'percentage') {
-                        $discountAmount = $subtotal * ($discountValue / 100);
-                    } elseif ($discountType === 'fixed') {
-                        $discountAmount = $discountValue;
-                    }
-                }
-            }
-            
-            $total = $subtotal - $discountAmount;
+            $price = $this->getProductPrice($product);
+            $productId = $this->getProductAttribute($product, 'id');
+            $stockUnit = $this->getProductAttribute($product, 'stock_unit', 'Piece');
             
             $items[] = [
-                'product_id' => $product->id,
-                'product_name' => $product->name,
-                'product_code' => $product->item_code,
-                'quantity' => $quantity,
-                'unit' => $product->stock_unit,
+                'product_id' => $productId,
+                'quantity' => $qty,
+                'unit' => $stockUnit,
                 'price' => $price,
-                'discount_type' => $discountType,
-                'discount_value' => $discountValue,
-                'discount_amount' => round($discountAmount, 2),
-                'subtotal' => round($subtotal, 2),
-                'total' => round($total, 2),
+                'subtotal' => $price * $qty,
+                'total' => $price * $qty,
             ];
         }
         
         return $items;
+    }
+
+    /**
+     * Get product price (handles both array and object).
+     *
+     * @param mixed $product
+     * @return float
+     */
+    private function getProductPrice($product): float
+    {
+        if (is_array($product)) {
+            // Try selling_price first, then original_price, then regular_price, default to 0
+            return (float) ($product['selling_price'] ?? $product['original_price'] ?? $product['regular_price'] ?? 0);
+        }
+        
+        if (is_object($product)) {
+            return (float) ($product->selling_price ?? $product->original_price ?? $product->regular_price ?? 0);
+        }
+        
+        return 0.0;
+    }
+
+    /**
+     * Get product quantity (handles both array and object).
+     *
+     * @param mixed $product
+     * @return int
+     */
+    private function getProductQuantity($product): int
+    {
+        if (is_array($product)) {
+            return (int) ($product['qty'] ?? 0);
+        }
+        
+        if (is_object($product)) {
+            return (int) ($product->qty ?? 0);
+        }
+        
+        return 0;
+    }
+
+    /**
+     * Get product attribute (handles both array and object).
+     *
+     * @param mixed $product
+     * @param string $attribute
+     * @param mixed $default
+     * @return mixed
+     */
+    private function getProductAttribute($product, string $attribute, $default = null)
+    {
+        if (is_array($product)) {
+            return $product[$attribute] ?? $default;
+        }
+        
+        if (is_object($product)) {
+            return $product->$attribute ?? $default;
+        }
+        
+        return $default;
     }
 
     /**

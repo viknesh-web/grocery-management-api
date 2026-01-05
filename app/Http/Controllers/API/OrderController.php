@@ -107,37 +107,6 @@ class OrderController extends Controller
         }
     }
 
-    /**
-     * Update payment status.
-     *
-     * @param Request $request
-     * @param Order $order
-     * @return JsonResponse
-     */
-    public function updatePaymentStatus(Request $request, Order $order): JsonResponse
-    {
-        try {
-            $request->validate([
-                'payment_status' => ['required', 'string', 'in:unpaid,paid,refunded']
-            ]);
-
-            $order->update([
-                'payment_status' => $request->payment_status,
-                'updated_by' => $request->user()->id,
-            ]);
-
-            return ApiResponse::success(
-                $order->fresh()->toArray(),
-                'Payment status updated successfully'
-            );
-        } catch (\Exception $e) {
-            Log::error('Failed to update payment status', [
-                'error' => $e->getMessage(),
-                'id' => $order->id
-            ]);
-            return ApiResponse::error('Failed to update payment status', null, 500);
-        }
-    }
 
     /**
      * Cancel order.

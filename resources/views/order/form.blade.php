@@ -126,18 +126,19 @@
     <table style="display:none">
         <tbody id="allProducts">
             @foreach($products as $product)
-            @php $price = $product->selling_price ?? $product->original_price; @endphp
+            @php $price = $product->selling_price ?? $product->regular_price; @endphp
             <tr data-category="{{ $product->category_id }}">
                 <td class="product-image">
                     <img src="{{ $product->image_url }}">
                 </td>
                 <td>{{ $product->name }}</td>
                 <td class="item-code">{{ $product->item_code }}</td>
+               
                 <td>
-                    @if(!empty($product->selling_price) && $product->selling_price < $product->original_price)
+                    @if(!empty($product->selling_price) && $product->selling_price < $product->regular_price)
                         <div class="original-price">
                             <img src="{{ asset('assets/images/Dirham-Symbol-grey.png') }}" width="10">
-                            {{ number_format($product->original_price, 2) }}
+                            {{ number_format($product->regular_price, 2) }}
                         </div>
                         <div class="selling-price">
                             <img src="{{ asset('assets/images/Dirham-Symbol.png') }}" width="10">
@@ -147,9 +148,9 @@
                         @else
                         <div class="selling-price">
                             <img src="{{ asset('assets/images/Dirham-Symbol.png') }}" width="10">
-                            {{ number_format($product->original_price, 2) }} / {{ $product->stock_unit }}
+                            {{ number_format($product->regular_price, 2) }} / {{ $product->stock_unit }}
                         </div>
-                        <input type="hidden" class="price-value" value="{{ $product->original_price }}">
+                        <input type="hidden" class="price-value" value="{{ $product->regular_price }}">
                         @endif
                 </td>
                 <td>

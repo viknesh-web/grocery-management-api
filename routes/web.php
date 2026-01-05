@@ -1,12 +1,15 @@
 <?php
 
-use App\Http\Controllers\Web\OrderFormController;
+use App\Http\Controllers\Web\OrderController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', [OrderFormController::class, 'show']) ->name('order.form');
-Route::post('/order-form/pdf', [OrderFormController::class, 'downloadPdf']) ->name('order.pdf');
-Route::post('/order-review', [OrderFormController::class, 'review'])->name('order.review');
-Route::post('/order/confirmation', [OrderFormController::class, 'confirm'])->name('order.confirmation');
-Route::get('/order/confirmation', [OrderFormController::class, 'showConfirmation'])->name('order.confirmation.show');
-Route::get('/order-review', [OrderFormController::class, 'showReview'])     ->name('order.review.show');
-Route::get('/geoapify/address', [OrderFormController::class, 'geoapifyAddress']);
+// Order Form & Review Flow
+Route::controller(OrderController::class)->group(function () {
+    Route::get('/', 'index')->name('order.form');
+    Route::post('/order-review', 'review')->name('order.review');
+    Route::get('/order-review', 'showReview')->name('order.review.show');
+    Route::post('/order-form/pdf', 'downloadPdf')->name('order.pdf');    
+    Route::post('/order/confirmation', 'confirm')->name('order.confirmation.post');
+    Route::get('/order/confirmation', 'showConfirmation')->name('order.confirmation');
+    Route::get('/api/address/search', 'searchAddress')->name('order.address.search');
+});

@@ -85,21 +85,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::post('/whatsapp/send-message', [WhatsAppController::class, 'sendMessage']);
     Route::post('/whatsapp/send-product-update', [WhatsAppController::class, 'sendProductUpdate']);
     Route::post('/whatsapp/test-message/{customer}', [WhatsAppController::class, 'sendTestMessage'])->middleware(\App\Http\Middleware\CheckCustomer::class);
-    Route::post('/whatsapp/validate-number', [WhatsAppController::class, 'validateNumber']);
-
-    // Order Management Routes
-    Route::prefix('orders')->group(function () {
-        Route::get('/', [OrderController::class, 'index']);
-        Route::get('/statistics', [OrderController::class, 'statistics']);
-        
-        Route::group(['prefix' => '/{order}'], function () {
-            Route::get('/', [OrderController::class, 'show']);
-            Route::delete('/', [OrderController::class, 'destroy']);
-            Route::post('/status', [OrderController::class, 'updateStatus']);
-            Route::post('/payment-status', [OrderController::class, 'updatePaymentStatus']);
-            Route::post('/cancel', [OrderController::class, 'cancel']);
-        });
-    });
+    Route::post('/whatsapp/validate-number', [WhatsAppController::class, 'validateNumber']);   
 
 });
 
