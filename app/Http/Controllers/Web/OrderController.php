@@ -6,33 +6,59 @@ use App\Exceptions\BusinessException;
 use App\Exceptions\ValidationException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Order\ConfirmOrderRequest;
+use App\Models\Product;
 use App\Services\AddressService;
+use App\Services\CartService;
 use App\Services\OrderPdfService;
 use App\Services\OrderService;
+use App\Services\PriceCalculator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * Order Controller - Updated for CartService Integration
+ * 
+ * Changes from original:
+ * - Added CartService and PriceCalculator dependencies
+ * - Replaced session-based review with cart-based review
+ * - Pass UNIT_CONVERSIONS to views (not directly in JS)
+ * - Cleaner error handling
+ */
 class OrderController extends Controller
 {
     public function __construct(
         private OrderService $orderService,
         private OrderPdfService $pdfService,
-        private AddressService $addressService
+        private AddressService $addressService,
+        private CartService $cartService,
+        private PriceCalculator $priceCalculator
     ) {}
 
+    /**
+     * Show order form.
+     * 
+     * UPDATED: Pass UNIT_CONVERSIONS to view
+     */
     public function index(Request $request)
     {
         try {
             $formData = $this->orderService->getFormData();
             $selectedQty = $this->orderService->getReviewQuantities();
             
+            // Clear cart if not coming from review page
             if (!$this->orderService->isFromReview($request->get('from'))) {
                 $this->orderService->clearSession();
                 $selectedQty = [];
             }
             
-            return view('order.form', array_merge($formData, ['selectedQty' => $selectedQty]));
+            // UPDATED: Pass unit conversions to view
+            $unitConversions = Product::UNIT_CONVERSIONS;
+            
+            return view('order.form', array_merge($formData, [
+                'selectedQty' => $selectedQty,
+                'unitConversions' => $unitConversions, // ← Pass to view
+            ]));
         } catch (\Exception $e) {
             Log::error('Failed to load order form', ['error' => $e->getMessage()]);
             return redirect()->route('order.form')
@@ -40,17 +66,19 @@ class OrderController extends Controller
         }
     }
 
+    /**
+     * Process review (form submission).
+     * 
+     * UPDATED: Now uses CartService instead of session
+     */
     public function review(Request $request)
     {
         try {
-            $products = $this->orderService->processReview($request->products ?? []);
-            $reviewQty = collect($request->products ?? [])
-                ->filter(fn($p) => isset($p['qty']) && $p['qty'] > 0)
-                ->toArray();
-            
-            $this->orderService->saveReviewToSession($products, $reviewQty);
+            // Process and save to cart (returns cart ID)
+            $this->orderService->processReview($request->products ?? []);
             
             return redirect()->route('order.review.show');
+            
         } catch (ValidationException $e) {
             return redirect()->back()
                 ->with('error', $e->getMessage())
@@ -63,62 +91,99 @@ class OrderController extends Controller
         }
     }
 
+    /**
+     * Show review page.
+     * 
+     * UPDATED: Gets products from CartService
+     */
     public function showReview()
     {
         try {
+            // Get products from cart (fresh from DB)
             $products = $this->orderService->getReviewProducts();
+            
+            if ($products->isEmpty()) {
+                return redirect()->route('order.form')
+                    ->with('error', 'Cart is empty. Please add products.');
+            }
+            
             return view('order.review', compact('products'));
+            
         } catch (ValidationException $e) {
             return redirect()->route('order.form')
                 ->with('error', $e->getMessage());
+        } catch (\Exception $e) {
+            Log::error('Failed to show review', ['error' => $e->getMessage()]);
+            return redirect()->route('order.form')
+                ->with('error', 'Unable to load review page. Please try again.');
         }
     }
 
+    /**
+     * Download PDF of order.
+     * 
+     * UPDATED: Gets products from CartService
+     */
     public function downloadPdf(Request $request)
     {
         try {
-            $products = session('review_products');
+            // Get products from cart (not session)
+            $products = $this->orderService->getReviewProducts();
             
-            if (!$products || $products->isEmpty()) {
+            if ($products->isEmpty()) {
                 return redirect()->route('order.review.show')
                     ->with('error', 'No products found for PDF generation.');
             }
             
             return $this->pdfService->generate($products);
+            
+        } catch (ValidationException $e) {
+            return redirect()->route('order.review.show')
+                ->with('error', $e->getMessage());
         } catch (BusinessException $e) {
             return redirect()->route('order.review.show')
                 ->with('error', $e->getMessage());
+        } catch (\Exception $e) {
+            Log::error('Failed to generate PDF', ['error' => $e->getMessage()]);
+            return redirect()->route('order.review.show')
+                ->with('error', 'Unable to generate PDF. Please try again.');
         }
     }
 
+    /**
+     * Confirm order (AJAX endpoint).
+     * 
+     * UPDATED: Gets products from CartService
+     */
     public function confirm(ConfirmOrderRequest $request): JsonResponse
     {
         try {
             $validated = $request->validated();
-            $products = session('review_products');
             
-            if (!$products || count($products) === 0) {
+            // Get products from cart (not session)
+            $products = $this->orderService->getReviewProducts();
+            
+            if ($products->isEmpty()) {
                 return response()->json([
                     'status' => false,
-                    'message' => 'No products selected. Please add products to your order.',
+                    'message' => 'Cart is empty. Please add products to your order.',
                 ], 400);
             }
             
+            // Prepare order data
             $orderData = [
                 'customer_name' => $validated['customer_name'],
                 'customer_email' => $validated['email'] ?? null,
                 'customer_phone' => $validated['whatsapp'],
                 'customer_address' => $validated['address'],
-                'products' => $products->toArray(),
+                'products' => $products, // Pass collection (OrderService handles it)
                 'grand_total' => $validated['grand_total'],
             ];
             
+            // Create order (cart is cleared automatically inside service)
             $order = $this->orderService->createFromWebForm($orderData);
             
-            // Clear review session
-            $this->orderService->clearSession();
-            
-            // Store only order ID in session - we'll fetch data from DB
+            // Store order ID for confirmation page
             $this->orderService->saveConfirmationToSession([
                 'order_id' => $order->id,
             ]);
@@ -148,6 +213,11 @@ class OrderController extends Controller
         }
     }
 
+    /**
+     * Show order confirmation page.
+     * 
+     * UNCHANGED - works as before
+     */
     public function showConfirmation()
     {
         try {
@@ -186,6 +256,11 @@ class OrderController extends Controller
         }
     }
 
+    /**
+     * Search UAE addresses (AJAX endpoint).
+     * 
+     * UNCHANGED - works as before
+     */
     public function searchAddress(Request $request): JsonResponse
     {
         try {

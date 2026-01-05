@@ -31,10 +31,14 @@
                 @php $grandTotal = 0; @endphp
                 @foreach($products as $product)
                     @php
+                        $qty = $product->cart_qty ?? $product->qty ?? 0; 
+                        $unit = $product->cart_unit ?? $product->stock_unit;
+
                         $price = ($product->selling_price > 0 && $product->selling_price < $product->regular_price)
                             ? $product->selling_price
                             : $product->regular_price;
-                        $rowTotal = $price * $product->qty;
+
+                        $rowTotal = $product->cart_subtotal ?? ($price * $qty);  
                         $grandTotal += $rowTotal;
                     @endphp
                     <tr>
@@ -62,7 +66,7 @@
                             @endif
                         </td>
                         <td>
-                            <span class="qty-badge">{{ $product->qty }}</span>
+                             <span class="qty-badge">{{ $qty }} {{ $unit }}</span>
                         </td>
                         <td class="total-cell">
                             <img src="{{ asset('assets/images/Dirham-Symbol-grey.png') }}" width="12"> 

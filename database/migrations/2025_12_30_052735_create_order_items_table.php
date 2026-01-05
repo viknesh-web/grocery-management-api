@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('order_id')->constrained('orders')->cascadeOnDelete();
             $table->foreignId('product_id')->constrained('products')->cascadeOnDelete();
             $table->decimal('quantity', 10, 2)->unsigned();
-            $table->string('unit', 50);
+            $table->string('unit', 50)->default('kg');
             $table->decimal('price', 10, 2)->unsigned();
             $table->enum('discount_type', ['none', 'percentage', 'fixed'])->default('none');
             $table->decimal('discount_value', 10, 2)->default(0)->unsigned();
