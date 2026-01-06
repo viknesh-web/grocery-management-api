@@ -104,66 +104,66 @@
     </div>
     
     <!-- ORDER MODAL -->
-    <div id="orderModal" class="modal-overlay" data-submit-url="{{ route('order.confirmation.post') }}">
+    <div id="orderModal" class="modal-overlay" data-submit-url="/order/confirmation">
         <div class="modal-box">
             <h3>Customer Details</h3>
+            <p class="modal-subtitle">Please fill in your information to complete the order</p>
             
             <form id="orderConfirmForm">
-                @csrf
-                
                 <div class="form-group">
-                    <label for="customer_name">Name <span style="color:#dc2626;">*</span></label>
+                    <label for="customer_name">
+                        Full Name <span class="required">*</span>
+                    </label>
                     <input 
                         type="text" 
                         id="customer_name"
                         name="customer_name" 
                         oninput="this.value = this.value.replace(/[^a-zA-Z\s]/g, '')" 
-                        value="{{ old('customer_name') }}" 
                         required
                         placeholder="Enter your full name"
                     >
                 </div>
                 
                 <div class="form-group">
-                    <label for="whatsapp">WhatsApp Number <span style="color:#dc2626;">*</span></label>
+                    <label for="whatsapp">
+                        WhatsApp Number <span class="required">*</span>
+                    </label>
                     <input 
                         type="text" 
                         id="whatsapp"
                         name="whatsapp" 
                         oninput="this.value = this.value.replace(/[^0-9+\-\s]/g, '')" 
-                        value="{{ old('whatsapp') }}" 
                         required
-                        placeholder="e.g., +971501234567"
+                        placeholder="e.g., +971 50 123 4567"
                     >
                 </div>
                 
                 <div class="form-group">
-                    <label for="email">Email</label>
+                    <label for="email">Email Address</label>
                     <input 
                         type="email" 
                         id="email"
                         name="email" 
-                        value="{{ old('email') }}"
-                        placeholder="your.email@example.com (optional)"
+                        placeholder="your.email@example.com"
                     >
                 </div>
                 
                 <div class="form-group" style="position:relative;">
-                    <label for="addressInput">Address (Dubai only) <span style="color:#dc2626;">*</span></label>
+                    <label for="addressInput">
+                        Delivery Address <span class="required">*</span>
+                    </label>
                     <input 
                         type="text" 
                         id="addressInput" 
                         name="address" 
                         autocomplete="off" 
                         placeholder="Start typing Dubai address"
-                        value="{{ old('address') }}"
                         required
                     >
                     <ul id="addressSuggestions" class="address-dropdown"></ul>
                 </div>
                 
-                <!-- Pass Grand Total -->
-                <input type="hidden" name="grand_total" value="{{ $grandTotal }}">
+                <input type="hidden" name="grand_total" value="0">
                 
                 <div id="formErrors" style="display:none;"></div>
                 

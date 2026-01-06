@@ -273,12 +273,14 @@ class OrderController extends Controller
             $areas = $this->addressService->searchUAEAreas($query);
             
             $features = array_map(function ($area) {
+                $full_address = $area['full_address'];
                 $formatted = $area['area'] ?? $area['full_address'] ?? '';
                 $addressLine1 = trim(($area['house_number'] ?? '') . ' ' . ($area['street'] ?? ''));
                 $addressLine2 = trim(($area['building'] ?? '') . ' ' . ($area['apartment'] ?? ''));
                 
                 return [
                     'properties' => [
+                        'full_address' => $full_address,
                         'formatted' => $formatted,
                         'address_line1' => $addressLine1 ?: null,
                         'address_line2' => $addressLine2 ?: null,
