@@ -65,15 +65,7 @@ class OrderRepository extends BaseRepository
     {
         $query = $this->query();
 
-        // Apply filter scope (handles: search, status, payment_status, customer_id, date_from, date_to)
-        if (method_exists(Order::class, 'scopeFilter')) {
-            $query->filter($filters);
-        } else {
-            // Fallback if scope doesn't exist yet
-            $this->applyFilters($query, $filters);
-        }
-
-        // Eager load relations
+        $query->filter($filters);
         if (!empty($relations)) {
             $query->with($relations);
         }
@@ -254,8 +246,6 @@ class OrderRepository extends BaseRepository
             'completed' => Order::where('status', 'completed')->count(),
             'cancelled' => Order::where('status', 'cancelled')->count(),
             'today' => Order::whereDate('created_at', today())->count(),
-            'unpaid' => Order::where('payment_status', 'unpaid')->count(),
-            'paid' => Order::where('payment_status', 'paid')->count(),
         ];
     }
 }

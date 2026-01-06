@@ -129,5 +129,44 @@ class Order extends Model
     {
         return $query->where('status', 'completed');
     }
+
+     /**
+     * Scope: Cancelled orders
+     */
+    public function scopeCancelled(Builder $query): Builder
+    {
+        return $query->where('status', 'cancelled');
+    }
+
+    /**
+     * Scope: Orders by date range
+     */
+    public function scopeDateRange(Builder $query, string $startDate, string $endDate): Builder
+    {
+        return $query->whereBetween('order_date', [$startDate, $endDate]);
+    }
+
+    /**
+     * Scope: Today's orders
+     */
+    public function scopeToday(Builder $query): Builder
+    {
+        return $query->whereDate('order_date', today());
+    }
+    /**
+     * Scope: This week's orders
+     */
+    public function scopeThisWeek(Builder $query): Builder
+    {
+        return $query->whereBetween('order_date', [now()->startOfWeek(), now()->endOfWeek()]);
+    }
+
+    /**
+     * Scope: This month's orders
+     */
+    public function scopeThisMonth(Builder $query): Builder
+    {
+        return $query->whereMonth('order_date', now()->month)->whereYear('order_date', now()->year);
+    }
 }
 
