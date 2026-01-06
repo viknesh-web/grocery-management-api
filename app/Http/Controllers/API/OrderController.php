@@ -4,6 +4,7 @@ namespace App\Http\Controllers\API;
 
 use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Order\OrderRequest;
 use App\Models\Order;
 use App\Repositories\OrderRepository;
 use App\Services\OrderService;
@@ -19,7 +20,8 @@ use Illuminate\Support\Facades\Log;
 class OrderController extends Controller
 {
     public function __construct(
-        private OrderService $orderService
+        private OrderService $orderService,
+        private OrderRepository $orderRepository
     ) {}
 
     /**
@@ -28,26 +30,31 @@ class OrderController extends Controller
      * @param Request $request
      * @return JsonResponse
      */
-    public function index(Request $request): JsonResponse
+    public function index(OrderRequest $request): JsonResponse
     {
         try {
-            $filters = [
-                'search' => $request->get('search'),
-                'status' => $request->get('status'),
-                'payment_status' => $request->get('payment_status'),
-                'customer_id' => $request->get('customer_id'),
-                'date_from' => $request->get('date_from'),
-                'date_to' => $request->get('date_to'),
-                'sort_by' => $request->get('sort_by', 'created_at'),
-                'sort_order' => $request->get('sort_order', 'desc'),
-            ];
-
-            $perPage = $request->get('per_page', 15);
+            $filters = $request->getFilters();
+            $pagination = $request->getPagination();
+            
+            $page = $pagination['page'] + 1;
+            $perPage = $pagination['limit'];
+            
+            \Illuminate\Pagination\Paginator::currentPageResolver(function () use ($page) {
+                return $page;
+            });
+            
             $orders = $this->orderService->getPaginated($filters, $perPage);
-
-            return ApiResponse::paginated($orders);
+            return response()->json([
+                'success' => true,
+                'data' => $orders->items(),
+                'total' => $orders->total(),
+                'page' => max(0, $page - 1),
+            ]);
         } catch (\Exception $e) {
-            Log::error('Failed to get orders', ['error' => $e->getMessage()]);
+            Log::error('Failed to get orders', [
+                'error' => $e->getMessage(),
+                'filters' => $filters ?? [],
+            ]);
             return ApiResponse::error('Failed to load orders', null, 500);
         }
     }
@@ -66,6 +73,12 @@ class OrderController extends Controller
             if (!$order) {
                 return ApiResponse::notFound('Order not found');
             }
+
+            $order->load([
+                'customer:id,name,whatsapp_number,email,address',
+                'items.product:id,name,item_code,image',
+            ]);
+
 
             return ApiResponse::success($order->toArray());
         } catch (\Exception $e) {
@@ -176,6 +189,31 @@ class OrderController extends Controller
         } catch (\Exception $e) {
             Log::error('Failed to get order statistics', ['error' => $e->getMessage()]);
             return ApiResponse::error('Failed to load statistics', null, 500);
+        }
+    }
+
+     /**
+     * Get customer orders.
+     * 
+     */
+    public function customerOrders(Request $request, int $customerId): JsonResponse
+    {
+        try {
+            $limit = $request->get('limit', 20);
+            
+            $orders = $this->orderRepository->getByCustomer(
+                $customerId,
+                $limit,
+                ['items:id,order_id,product_name,quantity,total']
+            );
+
+            return ApiResponse::success($orders->toArray());
+        } catch (\Exception $e) {
+            Log::error('Failed to get customer orders', [
+                'error' => $e->getMessage(),
+                'customer_id' => $customerId,
+            ]);
+            return ApiResponse::error('Failed to load customer orders', null, 500);
         }
     }
 }

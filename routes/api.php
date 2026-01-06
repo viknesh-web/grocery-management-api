@@ -73,6 +73,20 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         });
     });  
 
+    Route::prefix('orders')->middleware([\App\Http\Middleware\CheckOrder::class])->group(function () {
+        Route::get('/', [OrderController::class, 'index']);
+        Route::get('/statistics', [OrderController::class, 'statistics']);
+        Route::get('/revenue-stats', [OrderController::class, 'revenueStats']);
+        Route::get('/customer/{customerId}', [OrderController::class, 'customerOrders']);
+        
+        Route::group(['prefix' => '/{order}'], function () {
+            Route::get('/', [OrderController::class, 'show']);
+            Route::delete('/', [OrderController::class, 'destroy']);
+            Route::post('/status', [OrderController::class, 'updateStatus']);
+            Route::post('/cancel', [OrderController::class, 'cancel']);
+        });
+    });
+
     Route::get('/addresses/search-uae', [AddressController::class, 'searchUAE']);
 
     Route::get('/price-updates/products', [PriceUpdateController::class, 'getProducts']);
