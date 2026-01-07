@@ -26,7 +26,7 @@ class OrderRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'search' => ['sometimes', 'string', 'max:255'],
+            'search' => ['sometimes','max:255'],
             'status' => ['sometimes', 'string', Rule::in(['pending', 'confirmed', 'processing', 'completed', 'cancelled'])],
             'customer_ids' => ['sometimes', 'array'],
             'customer_ids.*' => ['integer', 'exists:customers,id'],
@@ -35,7 +35,7 @@ class OrderRequest extends FormRequest
             'date_to' => ['sometimes', 'date', 'after_or_equal:date_from'],
             'sort_by' => ['sometimes', 'string', Rule::in(['order_number', 'customer_name', 'total', 'status', 'order_date', 'created_at'])],
             'sort_order' => ['sometimes', 'string', Rule::in(['asc', 'desc'])],
-            'page' => ['sometimes', 'integer', 'min:1'],
+            'page' => ['sometimes', 'integer'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
         ];
     }
@@ -51,7 +51,7 @@ class OrderRequest extends FormRequest
             'search' => $this->get('search'),
             'status' => $this->get('status'),
             'customer_ids' => $this->get('customer_ids'),
-            'customer_address' => $this->get('customer_address'),
+            'customer_address' => $this->get('query'),
             'date_from' => $this->get('date_from'),
             'date_to' => $this->get('date_to'),
             'sort_by' => $this->get('sort_by', 'created_at'),

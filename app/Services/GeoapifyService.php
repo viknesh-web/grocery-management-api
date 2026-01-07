@@ -9,14 +9,6 @@ use Illuminate\Support\Facades\Log;
 /**
  * Geoapify Service
  * 
- * Handles all Geoapify API interactions.
- * 
- * Responsibilities:
- * - Geoapify API client initialization
- * - Address autocomplete API calls
- * - API error handling
- * - Response parsing
- * - Configuration validation
  */
 class GeoapifyService
 {
@@ -36,18 +28,7 @@ class GeoapifyService
     private const DEFAULT_LIMIT = 20;
 
     /**
-     * Search for addresses using Geoapify Autocomplete API.
-     * 
-     * Handles:
-     * - API request construction
-     * - HTTP request execution
-     * - Response parsing
-     * - Error handling
-     *
-     * @param string $query Search query
-     * @param array $options Additional options (limit, filter, etc.)
-     * @return array Raw API response features
-     * @throws ServiceException
+     * Search for addresses using Geoapify Autocomplete API. 
      */
     public function autocomplete(string $query, array $options = []): array
     {
@@ -56,7 +37,6 @@ class GeoapifyService
         $apiKey = config('services.geoapify.key');
         $baseUrl = config('services.geoapify.base_url', 'https://api.geoapify.com/v1/geocode/autocomplete');
 
-        // Build query parameters
         $params = array_merge([
             'text' => $query,
             'apiKey' => $apiKey,
@@ -65,7 +45,6 @@ class GeoapifyService
         ], $options);
 
         try {
-            // Make HTTP request using Laravel's Http facade
             $response = Http::timeout(self::DEFAULT_TIMEOUT)
                 ->connectTimeout(self::DEFAULT_CONNECT_TIMEOUT)
                 ->withHeaders([
@@ -74,19 +53,16 @@ class GeoapifyService
                 ])
                 ->get($baseUrl, $params);
 
-            // Handle HTTP errors
             if (!$response->successful()) {
                 $this->handleHttpError($response->status(), $response->body(), $query);
             }
 
-            // Parse JSON response
             $data = $response->json();
 
             if ($data === null) {
                 throw new ServiceException('Invalid JSON response from Geoapify API');
             }
 
-            // Return features array
             return $data['features'] ?? [];
         } catch (\Illuminate\Http\Client\ConnectionException $e) {
             Log::error('Geoapify API connection error', [
@@ -106,14 +82,6 @@ class GeoapifyService
         }
     }
 
-    /**
-     * Validate Geoapify configuration.
-     * 
-     * Checks if required configuration values are present.
-     *
-     * @return void
-     * @throws ServiceException
-     */
     public function validateConfiguration(): void
     {
         $apiKey = config('services.geoapify.key');
@@ -128,28 +96,12 @@ class GeoapifyService
         }
     }
 
-    /**
-     * Check if Geoapify is configured.
-     *
-     * @return bool
-     */
     public function isConfigured(): bool
     {
         return !empty(config('services.geoapify.key')) &&
                !empty(config('services.geoapify.base_url'));
     }
 
-    /**
-     * Handle HTTP errors from Geoapify API.
-     * 
-     * Maps HTTP status codes to user-friendly error messages.
-     *
-     * @param int $statusCode
-     * @param string $responseBody
-     * @param string $query
-     * @return void
-     * @throws ServiceException
-     */
     protected function handleHttpError(int $statusCode, string $responseBody, string $query): void
     {
         $errorMessage = match ($statusCode) {

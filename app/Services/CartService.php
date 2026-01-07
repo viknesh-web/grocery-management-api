@@ -9,24 +9,6 @@ use Illuminate\Support\Facades\Cache;
 
 /**
  * Cart Service
- * 
- * Lightweight cart management using cache instead of session.
- * 
- * Benefits:
- * - Only stores IDs + quantities (not full product objects)
- * - Uses Redis/Memcached for scalability
- * - Auto-expiry (no manual cleanup)
- * - Fresh product data from DB
- * - Stateless (good for horizontal scaling)
- * 
- * Storage Structure:
- * cache:cart:{cart_id} => [
- *     'items' => [
- *         product_id => ['qty' => float, 'unit' => string]
- *     ],
- *     'created_at' => timestamp,
- *     'updated_at' => timestamp,
- * ]
  */
 class CartService
 {
@@ -39,20 +21,11 @@ class CartService
         private PriceCalculator $priceCalculator
     ) {}
     
-    /**
-     * Add item to cart.
-     *
-     * @param int $productId
-     * @param float $quantity
-     * @param string|null $unit
-     * @return string Cart ID
-     */
     public function addItem(int $productId, float $quantity, ?string $unit = null): string
     {
         $cartId = $this->getOrCreateCartId();
         $cart = $this->getCartData($cartId);
         
-        // Get product to determine default unit
         $product = $this->productRepository->find($productId);
         if (!$product) {
             throw new \InvalidArgumentException("Product not found: {$productId}");
@@ -67,16 +40,8 @@ class CartService
         $this->saveCartData($cartId, $cart);
         
         return $cartId;
-    }
-    
-    /**
-     * Update item quantity in cart.
-     *
-     * @param int $productId
-     * @param float $quantity
-     * @param string|null $unit
-     * @return void
-     */
+    }    
+  
     public function updateItem(int $productId, float $quantity, ?string $unit = null): void
     {
         $cartId = $this->getCartId();
@@ -97,13 +62,7 @@ class CartService
             $this->saveCartData($cartId, $cart);
         }
     }
-    
-    /**
-     * Remove item from cart.
-     *
-     * @param int $productId
-     * @return void
-     */
+   
     public function removeItem(int $productId): void
     {
         $cartId = $this->getCartId();
@@ -118,15 +77,8 @@ class CartService
             $cart['updated_at'] = now()->timestamp;
             $this->saveCartData($cartId, $cart);
         }
-    }
-    
-    /**
-     * Save entire cart (bulk operation).
-     * Used when processing order form submission.
-     *
-     * @param array $items ['product_id' => ['qty' => float, 'unit' => string], ...]
-     * @return string Cart ID
-     */
+    }   
+  
     public function saveCart(array $items): string
     {
         $cartId = $this->getOrCreateCartId();
@@ -140,16 +92,8 @@ class CartService
         $this->saveCartData($cartId, $cart);
         
         return $cartId;
-    }
-    
-    /**
-     * Get cart items as Product collection with quantities.
-     * 
-     * Returns fresh data from DB + quantities from cache.
-     *
-     * @param string|null $cartId
-     * @return Collection<Product>
-     */
+    }    
+
     public function getCart(?string $cartId = null): Collection
     {
         $cartId = $cartId ?? $this->getCartId();
@@ -164,18 +108,12 @@ class CartService
             return collect();
         }
         
-        // Get product IDs
-        $productIds = array_keys($cart['items']);
-        
-        // Fetch products from DB (always fresh data)
+        $productIds = array_keys($cart['items']);        
         $products = $this->productRepository->findMany($productIds, ['category'])
-            ->where('status', 'active'); // Only active products
+            ->where('status', 'active'); 
         
-        // Attach cart quantities and calculate prices
         return $products->map(function ($product) use ($cart) {
-            $cartItem = $cart['items'][$product->id];
-            
-            // Add cart-specific attributes
+            $cartItem = $cart['items'][$product->id];            
             $product->cart_qty = $cartItem['qty'];
             $product->cart_unit = $cartItem['unit'];
             $product->cart_price = $this->priceCalculator->getEffectivePrice($product);
@@ -188,12 +126,7 @@ class CartService
             return $product;
         })->values();
     }
-    
-    /**
-     * Get cart items count.
-     *
-     * @return int
-     */
+
     public function getItemCount(): int
     {
         $cartId = $this->getCartId();
@@ -203,13 +136,8 @@ class CartService
         
         $cart = $this->getCartData($cartId);
         return count($cart['items'] ?? []);
-    }
-    
-    /**
-     * Get cart totals.
-     *
-     * @return array ['subtotal' => float, 'discount' => float, 'total' => float, 'item_count' => int]
-     */
+    }    
+
     public function getCartTotals(): array
     {
         $products = $this->getCart();
@@ -233,13 +161,8 @@ class CartService
         $totals['item_count'] = $products->count();
         
         return $totals;
-    }
-    
-    /**
-     * Clear cart.
-     *
-     * @return void
-     */
+    }    
+ 
     public function clearCart(): void
     {
         $cartId = $this->getCartId();
@@ -247,23 +170,13 @@ class CartService
             Cache::forget(self::CACHE_PREFIX . $cartId);
             session()->forget(self::SESSION_KEY);
         }
-    }
-    
-    /**
-     * Get cart ID from session or parameter.
-     *
-     * @return string|null
-     */
+    }    
+ 
     private function getCartId(): ?string
     {
         return session(self::SESSION_KEY);
     }
-    
-    /**
-     * Get or create cart ID.
-     *
-     * @return string
-     */
+  
     private function getOrCreateCartId(): string
     {
         $cartId = $this->getCartId();
@@ -276,22 +189,12 @@ class CartService
         return $cartId;
     }
     
-    /**
-     * Generate unique cart ID.
-     *
-     * @return string
-     */
+
     private function generateCartId(): string
     {
         return 'cart_' . uniqid('', true) . '_' . time();
     }
-    
-    /**
-     * Get cart data from cache.
-     *
-     * @param string $cartId
-     * @return array
-     */
+
     private function getCartData(string $cartId): array
     {
         $data = Cache::get(self::CACHE_PREFIX . $cartId);
@@ -305,15 +208,8 @@ class CartService
         }
         
         return $data;
-    }
-    
-    /**
-     * Save cart data to cache.
-     *
-     * @param string $cartId
-     * @param array $cart
-     * @return void
-     */
+    }    
+
     private function saveCartData(string $cartId, array $cart): void
     {
         Cache::put(
@@ -322,12 +218,7 @@ class CartService
             now()->addSeconds(self::CACHE_TTL)
         );
     }
-    
-    /**
-     * Validate cart items (check product availability, stock).
-     * 
-     * @return array ['valid' => bool, 'errors' => array]
-     */
+
     public function validateCart(): array
     {
         $products = $this->getCart();
@@ -339,25 +230,17 @@ class CartService
         }
         
         foreach ($products as $product) {
-            // Check if product is still active
             if ($product->status !== 'active') {
                 $errors[] = "Product '{$product->name}' is no longer available";
-            }
-            
-            // Add more validation as needed (stock check, etc.)
+            }            
         }
         
         return [
             'valid' => empty($errors),
             'errors' => $errors,
         ];
-    }
-    
-    /**
-     * Get raw cart items (for form submission).
-     * 
-     * @return array ['product_id' => ['qty' => float, 'unit' => string], ...]
-     */
+    }    
+
     public function getRawCartItems(): array
     {
         $cartId = $this->getCartId();

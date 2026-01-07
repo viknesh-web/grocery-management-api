@@ -80,18 +80,30 @@ class Order extends Model
             ->when($filters['search'] ?? null, function ($q, $search) {
                 $q->where(function ($query) use ($search) {
                     $query->where('order_number', 'like', "%{$search}%")
-                          ->orWhere('customer_name', 'like', "%{$search}%")
-                          ->orWhere('customer_email', 'like', "%{$search}%")
-                          ->orWhere('customer_phone', 'like', "%{$search}%")
                           ->orWhereHas('customer', function ($q) use ($search) {
-                              $q->where('name', 'like', "%{$search}%");
+                              $q->where('name', 'like', "%{$search}%")
+                                ->orWhere('whatsapp_number', 'like', "%{$search}%")
+                                ->orWhere('email', 'like', "%{$search}%")
+                                ->orWhere('address', 'like', "%{$search}%");
                           });
                 });
             })
+            
+            ->when($filters['customer_address'] ?? null, function ($q, $address) {
+                $q->whereHas('customer', function ($query) use ($address) {
+                    $query->where('address', 'like', "%{$address}%");
+                });
+            })
+            
             ->when($filters['status'] ?? null, fn($q, $status) => 
                 $q->where('status', $status))
-            ->when($filters['customer_id'] ?? null, fn($q, $customerId) => 
-                $q->where('customer_id', $customerId))
+            
+            ->when($filters['customer_ids'] ?? null, function ($q, $ids) {
+                if (is_array($ids) && !empty($ids)) {
+                    $q->whereIn('customer_id', $ids);
+                }
+            })
+            
             ->when($filters['date_from'] ?? null, fn($q, $date) => 
                 $q->whereDate('order_date', '>=', $date))
             ->when($filters['date_to'] ?? null, fn($q, $date) => 

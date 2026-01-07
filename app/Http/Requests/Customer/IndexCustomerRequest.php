@@ -30,11 +30,11 @@ class IndexCustomerRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'search' => ['sometimes', 'string', 'max:255'],
+            'search' => ['sometimes', 'max:255'],
             'status' => ['sometimes', 'string', Rule::in(['active', 'inactive'])],
             'sort_by' => ['sometimes', 'string', Rule::in(['name', 'whatsapp_number', 'created_at'])],
             'sort_order' => ['sometimes', 'string', Rule::in(['asc', 'desc'])],
-            'page' => ['sometimes', 'integer', 'min:1'],
+            'page' => ['sometimes', 'integer', ],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
         ];
     }

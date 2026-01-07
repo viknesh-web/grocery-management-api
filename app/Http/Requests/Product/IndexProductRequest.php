@@ -30,7 +30,7 @@ class IndexProductRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'search' => ['sometimes', 'string', 'max:255'],
+            'search' => ['sometimes', 'max:255'],
             'category_id' => ['sometimes', 'integer', 'exists:categories,id'],
             'product_type' => ['sometimes', 'string', 'in:daily,standard'],
             'status' => ['sometimes', 'string', Rule::in(['active', 'inactive'])],
@@ -38,7 +38,7 @@ class IndexProductRequest extends FormRequest
             'stock_status' => ['sometimes', 'string', 'in:in_stock,low_stock,out_of_stock'],
             'sort_by' => ['sometimes', 'string', Rule::in(['name', 'regular_price', 'selling_price', 'stock_quantity', 'created_at', 'product_type'])],
             'sort_order' => ['sometimes', 'string', Rule::in(['asc', 'desc'])],
-            'page' => ['sometimes', 'integer', 'min:1'],
+            'page' => ['sometimes', 'integer',],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
         ];
     }

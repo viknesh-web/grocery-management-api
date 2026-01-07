@@ -11,15 +11,6 @@ use Illuminate\Support\Carbon;
 /**
  * Dashboard Service
  * 
- * Handles all business logic for dashboard operations.
- * 
- * Responsibilities:
- * - Dashboard statistics calculation
- * - Data aggregation
- * - Recent activity tracking
- * 
- * Does NOT contain:
- * - Direct model queries (uses repositories)
  */
 class DashboardService
 {
@@ -29,40 +20,15 @@ class DashboardService
         private CustomerRepository $customerRepository,
         private PriceUpdateRepository $priceUpdateRepository
     ) {}
-
-    /**
-     * Get dashboard statistics.
-     * 
-     * Handles:
-     * - Product statistics (via ProductRepository)
-     * - Category statistics (via CategoryRepository)
-     * - Customer statistics (via CustomerRepository)
-     * - Price update statistics (via PriceUpdateRepository)
-     * - Recent price changes
-     *
-     * @return array Dashboard statistics
-     */
+ 
     public function getStatistics(): array
     {
-        // Product statistics (business logic - data aggregation)
         $productStats = $this->getProductStatistics();
-        
-        // Category statistics (business logic - data aggregation)
-        $categoryStats = $this->getCategoryStatistics();
-        
-        // Customer statistics (business logic - data aggregation)
+        $categoryStats = $this->getCategoryStatistics();        
         $customerStats = $this->getCustomerStatistics();
-        
-        // Price update statistics (business logic - data aggregation)
         $priceUpdateStats = $this->getPriceUpdateStatistics();
-        
-        // Low stock products (business logic - data aggregation)
         $lowStockProducts = $this->getLowStockProductsCount();
-        
-        // Product type statistics (business logic - data aggregation)
         $productTypeStats = $this->getProductTypeStatistics();
-        
-        // Recent price changes (business logic - data retrieval)
         $recentPriceChanges = $this->getRecentPriceChanges();
 
         return [
@@ -77,14 +43,7 @@ class DashboardService
             'recent_price_changes' => $recentPriceChanges,
         ];
     }
-
-    /**
-     * Get product statistics.
-     * 
-     * Business logic: Calculates product counts by status.
-     *
-     * @return array
-     */
+   
     protected function getProductStatistics(): array
     {
         $totalProducts = $this->productRepository->count();
@@ -97,13 +56,6 @@ class DashboardService
         ];
     }
 
-    /**
-     * Get category statistics.
-     * 
-     * Business logic: Calculates category counts by status.
-     *
-     * @return array
-     */
     protected function getCategoryStatistics(): array
     {
         $category = $this->categoryRepository->all();
@@ -120,13 +72,6 @@ class DashboardService
         ];
     }
 
-    /**
-     * Get customer statistics.
-     * 
-     * Business logic: Calculates customer counts by status.
-     *
-     * @return array
-     */
     protected function getCustomerStatistics(): array
     {
         $totalCustomers = $this->customerRepository->count();
@@ -139,13 +84,7 @@ class DashboardService
         ];
     }
 
-    /**
-     * Get price update statistics.
-     * 
-     * Business logic: Calculates price updates in last 7 days.
-     *
-     * @return array
-     */
+  
     protected function getPriceUpdateStatistics(): array
     {
         $since = Carbon::now()->subDays(7);
@@ -156,13 +95,6 @@ class DashboardService
         ];
     }
 
-    /**
-     * Get low stock products count.
-     * 
-     * Business logic: Counts active products with stock < 10.
-     *
-     * @return int
-     */
     protected function getLowStockProductsCount(): int
     {
         return $this->productRepository->countByFilters([
@@ -171,13 +103,6 @@ class DashboardService
         ]);
     }
 
-    /**
-     * Get product type statistics.
-     * 
-     * Business logic: Calculates product counts by type.
-     *
-     * @return array
-     */
     protected function getProductTypeStatistics(): array
     {
         $dailyProducts = $this->productRepository->countByFilters(['product_type' => 'daily']);
@@ -189,14 +114,7 @@ class DashboardService
         ];
     }
 
-    /**
-     * Get recent price changes.
-     * 
-     * Business logic: Retrieves recent price updates with product relation.
-     *
-     * @param int $limit
-     * @return \Illuminate\Database\Eloquent\Collection
-     */
+
     protected function getRecentPriceChanges(int $limit = 10): \Illuminate\Database\Eloquent\Collection
     {
         $relations = ['product'];

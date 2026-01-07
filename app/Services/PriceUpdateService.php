@@ -7,20 +7,6 @@ use App\Repositories\ProductRepository;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Log;
 
-/**
- * Price Update Service
- * 
- * Handles all business logic for price update operations.
- * 
- * Responsibilities:
- * - Business logic orchestration
- * - Transaction management
- * - Bulk price updates with locking
- * - Price history tracking
- * - Old/new value comparisons
- * - Discount calculations
- * - Partial failure handling
- */
 class PriceUpdateService extends BaseService
 {
     public function __construct(
@@ -28,22 +14,6 @@ class PriceUpdateService extends BaseService
         private ProductRepository $productRepository
     ) {}
 
-    /**
-     * Bulk update product prices.
-     * 
-     * Handles:
-     * - Transaction locking to prevent race conditions
-     * - Product updates (via ProductRepository)
-     * - Change detection (old vs new values)
-     * - Discount calculations
-     * - Price update record creation
-     * - Partial failure handling (continues on individual errors)
-     *
-     * @param array $updates Array of update data: ['product_id' => int, 'regular_price' => float?, 'stock_quantity' => float?, 'discount_type' => string?, 'discount_value' => float?]
-     * @param int $userId
-     * @return array Result array with success status, updated count, errors, and results
-     * @throws \Exception
-     */
     public function bulkUpdatePrices(array $updates, int $userId): array
     {
         $results = [];
@@ -71,17 +41,9 @@ class PriceUpdateService extends BaseService
                     }
 
                     $productId = (int) $update['product_id'];
-
-                    // Get product with lock to prevent race conditions (business logic - prevent race conditions)
                     $product = $this->productRepository->findOrFailWithLock($productId);
-
-                    // Get old values before any updates (business logic - change detection)
                     $oldValues = $this->getOldProductValues($product);
-
-                    // Prepare update data (business logic - determine what to update)
                     $updateData = $this->prepareProductUpdateData($update, $oldValues, $product);
-
-                    // Check if there are actual changes (business logic - change detection)
                     $hasPriceChange = $this->hasPriceChange($oldValues, $updateData);
                     $hasStockChange = $this->hasStockChange($oldValues, $updateData);
                     $hasChanges = $hasPriceChange || $hasStockChange;
@@ -93,24 +55,16 @@ class PriceUpdateService extends BaseService
                             'updated_by' => $userId,
                         ]));
 
-                        // Reload product to get updated values (including any discount changes)
                         $product->refresh();
 
-                        // Get new values after update
                         $newValues = $this->getNewProductValues($product);
-
-                        // Check if discount changed (by comparing old vs new values)
                         $hasDiscountChange = $this->hasDiscountValueChange($oldValues, $newValues);
-
-                        // Calculate new selling price (business logic - price calculation)
                         $newSellingPrice = $this->calculateSellingPrice(
                             $newValues['regular_price'],
                             $newValues['discount_type'],
                             $newValues['discount_value']
                         );
 
-                        // Create price update record if there are any changes (business logic - history tracking)
-                        // Include discount changes even if they weren't part of the update
                         if ($hasPriceChange || $hasStockChange || $hasDiscountChange) {
                             $this->createPriceUpdateRecord($product, $oldValues, $newValues, $newSellingPrice, $userId);
                         }
@@ -172,67 +126,24 @@ class PriceUpdateService extends BaseService
         }, 'Bulk price update failed');
     }
 
-    /**
-     * Get price update history for a product.
-     * 
-     * Handles:
-     * - Price history retrieval (via repository)
-     * - Relation eager loading
-     *
-     * @param int $productId
-     * @param int $limit
-     * @return Collection<int, PriceUpdate>
-     */
     public function getProductPriceHistory(int $productId, int $limit = 50): Collection
     {
         $relations = ['updater'];
         return $this->repository->getProductHistory($productId, $limit, $relations);
     }
-
-    /**
-     * Get price updates by date range.
-     * 
-     * Handles:
-     * - Price updates retrieval (via repository)
-     * - Relation eager loading
-     *
-     * @param string $startDate
-     * @param string $endDate
-     * @return Collection<int, PriceUpdate>
-     */
+ 
     public function getPriceUpdatesByDateRange(string $startDate, string $endDate): Collection
     {
         $relations = ['product', 'updater'];
         return $this->repository->getByDateRange($startDate, $endDate, $relations);
     }
 
-    /**
-     * Get recent price updates.
-     * 
-     * Handles:
-     * - Recent price updates retrieval (via repository)
-     * - Relation eager loading
-     *
-     * @param int $limit
-     * @return Collection<int, PriceUpdate>
-     */
     public function getRecent(int $limit = 20): Collection
     {
         $relations = ['product', 'updater'];
         return $this->repository->getRecent($limit, $relations);
     }
 
-    /**
-     * Get products for price updates.
-     * 
-     * Handles:
-     * - Product retrieval (via ProductRepository)
-     * - Filtering by category and product type
-     * - Relation eager loading
-     *
-     * @param array $filters Filters (search, category_id, product_type)
-     * @return Collection<int, Product>
-     */
     public function getProductsForPriceUpdate(array $filters = []): \Illuminate\Database\Eloquent\Collection
     {
         $repositoryFilters = ['status' => 'active'];
@@ -243,7 +154,6 @@ class PriceUpdateService extends BaseService
             $repositoryFilters['search'] = $filters['search'];
         }
 
-        // Apply category filter (handles array, comma-separated string, or single value)
         if (isset($filters['category_id'])) {
             $categoryIds = $filters['category_id'];
             if (is_array($categoryIds)) {
@@ -253,10 +163,8 @@ class PriceUpdateService extends BaseService
             }
         }
 
-        // Apply product type filter (handles array, comma-separated string, or single value)
         if (isset($filters['product_type'])) {
             $productTypes = $filters['product_type'];
-            // For now, repository expects single value, so use first if array
             if (is_array($productTypes) && !empty($productTypes)) {
                 $repositoryFilters['product_type'] = $productTypes[0];
             } else {
@@ -268,16 +176,7 @@ class PriceUpdateService extends BaseService
             ->sortBy('name')
             ->values();
     }
-
-
-    /**
-     * Get old product values for comparison.
-     * 
-     * Business logic: Captures current state before updates.
-     *
-     * @param \App\Models\Product $product
-     * @return array
-     */
+   
     protected function getOldProductValues(\App\Models\Product $product): array
     {
         $activeDiscount = $product->activeDiscount();
@@ -290,14 +189,6 @@ class PriceUpdateService extends BaseService
         ];
     }
 
-    /**
-     * Get new product values after update.
-     * 
-     * Business logic: Captures state after updates.
-     *
-     * @param \App\Models\Product $product
-     * @return array
-     */
     protected function getNewProductValues(\App\Models\Product $product): array
     {
         $activeDiscount = $product->activeDiscount();
@@ -309,22 +200,11 @@ class PriceUpdateService extends BaseService
             'discount_value' => $activeDiscount ? $activeDiscount->discount_value : null,
         ];
     }
-
-    /**
-     * Prepare product update data from bulk update input.
-     * 
-     * Business logic: Determines what fields to update based on input.
-     *
-     * @param array $update Update data from request
-     * @param array $oldValues Current product values
-     * @param \App\Models\Product $product
-     * @return array Data ready for ProductRepository::update()
-     */
+  
     protected function prepareProductUpdateData(array $update, array $oldValues, \App\Models\Product $product): array
     {
         $updateData = [];
 
-        // Update regular price if provided and different
         if (isset($update['regular_price'])) {
             $newRegularPrice = (float) $update['regular_price'];
             if ($newRegularPrice != $oldValues['regular_price']) {
@@ -332,7 +212,6 @@ class PriceUpdateService extends BaseService
             }
         }
 
-        // Update stock quantity if provided and different
         if (isset($update['stock_quantity'])) {
             $newStockQuantity = (float) $update['stock_quantity'];
             if ($newStockQuantity != $oldValues['stock_quantity']) {
@@ -340,21 +219,9 @@ class PriceUpdateService extends BaseService
             }
         }
 
-        // Note: Discount updates are handled via ProductDiscount model
-        // This service doesn't directly update discounts, but tracks changes
-        // If discount fields are provided, we track them for comparison
-
         return $updateData;
     }
-
-
-    /**
-     * Check if price has changed.
-     *
-     * @param array $oldValues
-     * @param array $updateData
-     * @return bool
-     */
+  
     protected function hasPriceChange(array $oldValues, array $updateData): bool
     {
         if (!isset($updateData['regular_price'])) {
@@ -364,13 +231,6 @@ class PriceUpdateService extends BaseService
         return (float) $updateData['regular_price'] != (float) $oldValues['regular_price'];
     }
 
-    /**
-     * Check if stock has changed.
-     *
-     * @param array $oldValues
-     * @param array $updateData
-     * @return bool
-     */
     protected function hasStockChange(array $oldValues, array $updateData): bool
     {
         if (!isset($updateData['stock_quantity'])) {
@@ -379,17 +239,7 @@ class PriceUpdateService extends BaseService
 
         return (float) $updateData['stock_quantity'] != (float) $oldValues['stock_quantity'];
     }
-
-    /**
-     * Check if discount values have changed.
-     * 
-     * Compares old and new discount values to detect changes.
-     * Discounts are managed via ProductDiscount model, but we track changes.
-     *
-     * @param array $oldValues
-     * @param array $newValues
-     * @return bool
-     */
+ 
     protected function hasDiscountValueChange(array $oldValues, array $newValues): bool
     {
         $oldType = $oldValues['discount_type'] ?? null;
@@ -413,18 +263,7 @@ class PriceUpdateService extends BaseService
         return false;
     }
 
-    /**
-     * Create a price update record.
-     * 
-     * Business logic: Records price changes for audit/history purposes.
-     *
-     * @param \App\Models\Product $product
-     * @param array $oldValues
-     * @param array $newValues
-     * @param float $newSellingPrice
-     * @param int $userId
-     * @return void
-     */
+  
     protected function createPriceUpdateRecord(
         \App\Models\Product $product,
         array $oldValues,
@@ -447,20 +286,6 @@ class PriceUpdateService extends BaseService
         ]);
     }
 
-    /**
-     * Calculate selling price based on regular price, discount type, and discount value.
-     * 
-     * Business logic for price calculation:
-     * - No discount: selling price = regular price
-     * - Percentage discount: selling price = regular price - (regular price * discount / 100)
-     * - Fixed discount: selling price = regular price - discount
-     * - Minimum price: 0 (cannot be negative)
-     *
-     * @param float|null $regularPrice
-     * @param string|null $discountType 'none', 'percentage', or 'fixed'
-     * @param float|null $discountValue
-     * @return float
-     */
     protected function calculateSellingPrice(?float $regularPrice, ?string $discountType, ?float $discountValue): float
     {
         // Handle null or invalid regular price
@@ -468,22 +293,17 @@ class PriceUpdateService extends BaseService
             return 0.0;
         }
 
-        // No discount or invalid discount
         if (!$discountType || $discountType === 'none' || !$discountValue || $discountValue <= 0) {
             return round((float) $regularPrice, 2);
         }
 
-        // Calculate discount amount
         if ($discountType === 'percentage') {
             $discountAmount = $regularPrice * ($discountValue / 100);
-        } else { // fixed
+        } else {
             $discountAmount = $discountValue;
         }
-
-        // Calculate selling price (regular price - discount)
         $sellingPrice = $regularPrice - $discountAmount;
 
-        // Ensure price is not negative
         return max(0, round((float) $sellingPrice, 2));
     }
 }
