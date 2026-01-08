@@ -231,6 +231,11 @@ class OrderRepository extends BaseRepository
         return $orderNumber;
     }
 
+    public function getOrder(int $limit = 10, array $relations = []): Collection
+    {
+        return $this->query()->orderBy('created_at', 'desc')->limit($limit)->get();
+    }
+
     /**
      * Get order statistics.
      *
@@ -247,5 +252,20 @@ class OrderRepository extends BaseRepository
             'cancelled' => Order::where('status', 'cancelled')->count(),
             'today' => Order::whereDate('created_at', today())->count(),
         ];
+    }
+
+    public function getTotalAmountByDate(string $date): float
+    {
+        return (float) $this->query()->whereDate('created_at', $date)->sum('total_amount');
+    }
+
+    public function getTotalByDate(string $date): float
+    {
+        return (float) $this->query()->whereDate('created_at', $date)->count();
+    }
+
+    public function getTotalByMonth(int $year, int $month): float
+    {
+        return (float) $this->query()->whereYear('created_at', $year)->whereMonth('created_at', $month)->count();
     }
 }
