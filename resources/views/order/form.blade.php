@@ -66,7 +66,7 @@
                                     <th>Image</th>
                                     <th>Name</th>
                                     <th>Item Code</th>
-                                    <th>Selling Price</th>
+                                    <th>Price</th>
                                     <th>Quantity</th>
                                     <th>Total</th>
                                 </tr>
@@ -92,7 +92,7 @@
                                     <th>Image</th>
                                     <th>Name</th>
                                     <th>Item Code</th>
-                                    <th>Selling Price</th>
+                                    <th>Price</th>
                                     <th>Quantity</th>
                                     <th>Total</th>
                                 </tr>
@@ -113,7 +113,7 @@
                 No products found.
             </div>
             <!-- GRAND TOTAL -->
-            <table style="margin-top:10px;" class="grand-total">
+            <table class="grand-total">
                 <tfoot>
                     <tr class="grand-total">
                         <td colspan="5" align="right">Grand Total</td>
@@ -135,13 +135,13 @@
             @foreach($products as $product)
             @php $price = $product->selling_price ?? $product->regular_price; @endphp
             <tr data-category="{{ $product->category_id }}">
-                <td class="product-image">
+                <td class="product-image" data-label="Image">
                     <img src="{{ $product->image_url }}">
                 </td>
-                <td>{{ $product->name }}</td>
-                <td class="item-code">{{ $product->item_code }}</td>
+                <td class="order-product-name" data-label="Name">{{ $product->name }}</td>
+                <td class="item-code"  data-label="Item Code">{{ $product->item_code }}</td>
                
-                <td>
+                <td data-label="Price">
                     @if(!empty($product->selling_price) && $product->selling_price < $product->regular_price)
                         <div class="original-price">
                             <img src="{{ asset('assets/images/Dirham-Symbol-grey.png') }}" width="10">
@@ -160,20 +160,19 @@
                         <input type="hidden" class="price-value" value="{{ $product->regular_price }}">
                         @endif
                 </td>
-                <td>
-                    <div style="display: flex; gap: 5px; align-items: center;">
+                <td data-label="Quantity">
+                    <div style="display: flex; gap: 5px; align-items: center;justify-content: center;" class="order-qty-box">
                         <input type="number" 
                             step="0.01"
                             min="0" 
                             class="qty"
                             name="products[{{ $product->id }}][qty]"
-                            value="{{ $selectedQty[$product->id]['qty'] ?? '' }}"
-                            style="width: 60px;">
+                            value="{{ $selectedQty[$product->id]['qty'] ?? '' }}">
                         
                         <select name="products[{{ $product->id }}][unit]" 
                                 class="unit-select"
                                 data-base-unit="{{ $product->stock_unit }}"
-                                style="width: 70px; padding: 6px;">
+                                style="padding: 6px;">
                             @foreach($product->getAvailableUnits() as $unit)
                                 <option value="{{ $unit }}" 
                                     {{ ($selectedQty[$product->id]['unit'] ?? $product->stock_unit) === $unit ? 'selected' : '' }}>
@@ -183,7 +182,7 @@
                         </select>
                     </div>
                 </td>
-                <td>
+                <td data-label="Total">
                     <img src="{{ asset('assets/images/Dirham-Symbol-grey.png') }}" width="12">
                     <span class="row-total">0.00</span>
                 </td>

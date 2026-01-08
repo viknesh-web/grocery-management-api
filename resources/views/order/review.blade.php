@@ -14,7 +14,7 @@
             </div>
             <h2>Review Your Order</h2>
         </div>
-        
+        <div class="table-scroll">
         <table>
             <thead>
                 <tr>
@@ -76,7 +76,7 @@
                 @endforeach
             </tbody>
         </table>
-        
+    </div>
         <!-- GRAND TOTAL -->
         <div class="grand-total">
             Grand Total: 
