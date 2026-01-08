@@ -10,6 +10,15 @@
         <img src="{{ asset('assets/images/logo-xion.png') }}" alt="Xion Logo" style="max-width:150px;margin:auto;display:block;">   
         <h2 style="text-align:center;color:#16a34a;margin-bottom:8px;font-family:'Poppins-Medium';margin-top:30px;">Order Confirmed 🎉</h2>
         <p style="text-align:center;color:#6b7280;margin-bottom:24px;font-family:'Roboto-Regular';">Thank you for placing your order with us. Our team will contact you shortly to assist you further.</p>
+        
+        @if($isAdminOrder ?? false)
+        <div style="background:#dbeafe;border:1px solid #3b82f6;padding:12px;border-radius:8px;text-align:center;margin-bottom:16px;">
+            <p style="margin:0;color:#1e40af;font-size:13px;font-family:'Poppins-Medium';">
+                 Admin Order
+            </p>
+        </div>
+        @endif
+        
         <div style="background:#ecfdf5;border:1px dashed #10b981;padding:16px;border-radius:8px;text-align:center;margin-bottom:24px;">
             <p style="margin:5px 0;color:#065f46;font-size:15px;font-family:'Poppins-Medium';">Order Number</p>
             <p style="margin:0;font-size:22px;font-weight:bold;color:#064e3b;font-family:'Poppins-Bold';">{{ $data['order_number'] ?? 'N/A' }}</p>
@@ -44,7 +53,11 @@
             </p>
         </div>
         <div class="confirmation-submit">
-            <a href="{{ route('order.form') }}">Order Again</a>
+            @if($isAdminOrder && $adminOrderUrl)
+                <a href="{{ $adminOrderUrl }}" target="_blank" rel="noopener noreferrer">Order Again</a>
+            @else
+                <a href="{{ route('order.form') }}">Order Again</a>
+            @endif
         </div>    
     </div>
 </body>

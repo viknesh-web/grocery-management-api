@@ -233,6 +233,8 @@ class OrderController extends Controller
 
     /**
      * Confirm order (AJAX endpoint).
+     * 
+     * UPDATED: Calculate grand total on backend
      */
     public function confirm(ConfirmOrderRequest $request): JsonResponse
     {
@@ -248,13 +250,37 @@ class OrderController extends Controller
                 ], 400);
             }
             
+            // Calculate grand total on backend using PriceCalculator
+            $items = $products->map(fn($p) => [
+                'product' => $p,
+                'quantity' => $p->cart_qty ?? $p->qty ?? 0,
+                'unit' => $p->cart_unit ?? $p->stock_unit,
+            ])->toArray();
+            
+            $totals = $this->priceCalculator->calculateCartTotal($items);
+            $grandTotal = $totals['total'];
+            
+            // Validate that cart has items with value
+            if ($grandTotal <= 0) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Order total must be greater than zero.',
+                ], 400);
+            }
+            
+            Log::info('Order total calculated', [
+                'subtotal' => $totals['subtotal'],
+                'discount' => $totals['discount'],
+                'total' => $grandTotal,
+            ]);
+            
             $orderData = [
                 'customer_name' => $validated['customer_name'],
                 'customer_email' => $validated['email'] ?? null,
                 'customer_phone' => $validated['whatsapp'],
                 'customer_address' => $validated['address'],
                 'products' => $products,
-                'grand_total' => $validated['grand_total'],
+                'grand_total' => $grandTotal, // Use calculated total from backend
             ];
             
             // Check if this is an admin order
@@ -276,22 +302,38 @@ class OrderController extends Controller
                     Log::info('Admin order confirmation', [
                         'admin_id' => $adminUser->id,
                         'selected_customer_id' => $selectedCustomerId,
+                        'calculated_total' => $grandTotal,
                     ]);
                 }
             }
             
             $order = $this->orderService->createFromWebForm($orderData);
             
-            session()->forget(['admin_order', 'admin_user_id', 'selected_customer_id']);
-            
-            $this->orderService->saveConfirmationToSession([
+            // Save order ID and admin context to session for confirmation page
+            $confirmationData = [
                 'order_id' => $order->id,
-            ]);
+            ];
+            
+            // Preserve admin context for "Order Again" button
+            if ($isAdmin && $adminUser) {
+                $confirmationData['admin_user_id'] = $adminUser->id;
+                
+                Log::info('Preserving admin context for confirmation page', [
+                    'admin_id' => $adminUser->id,
+                    'order_id' => $order->id,
+                ]);
+            }
+            
+            $this->orderService->saveConfirmationToSession($confirmationData);
+            
+            // Now clear the temporary admin session data
+            session()->forget(['admin_order', 'admin_user_id', 'selected_customer_id']);
             
             return response()->json([
                 'status' => true,
                 'message' => 'Order placed successfully!',
                 'redirect_url' => route('order.confirmation'),
+                'order_total' => $grandTotal,
             ], 200);
             
         } catch (ValidationException $e) {
@@ -339,8 +381,35 @@ class OrderController extends Controller
                 'customer_address' => $order->customer?->address ?? 'N/A',
                 'total_amount' => $order->total,
             ];
+            
+            // Check if this was an admin order and generate new signed URL for "Order Again"
+            $adminOrderUrl = null;
+            $isAdminOrder = false;
+            
+            if (isset($sessionData['admin_user_id']) && $sessionData['admin_user_id']) {
+                $adminUser = User::find($sessionData['admin_user_id']);
+                
+                if ($adminUser && $adminUser->master) {
+                    $isAdminOrder = true;
+                    
+                    // Generate new signed URL for "Order Again"
+                    $adminOrderUrl = URL::temporarySignedRoute(
+                        'order.form',
+                        now()->addHour(),
+                        [
+                            'is_admin' => 1,
+                            'admin_user_id' => $adminUser->id,
+                        ]
+                    );
+                    
+                    Log::info('Generated new admin order URL for "Order Again"', [
+                        'admin_id' => $adminUser->id,
+                        'order_id' => $order->id,
+                    ]);
+                }
+            }
 
-            return view('order.confirmation', compact('data'));
+            return view('order.confirmation', compact('data', 'adminOrderUrl', 'isAdminOrder'));
             
         } catch (\Exception $e) {
             Log::error('Failed to show confirmation', ['error' => $e->getMessage()]);

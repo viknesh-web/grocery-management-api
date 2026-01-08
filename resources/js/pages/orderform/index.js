@@ -242,9 +242,18 @@ document.addEventListener("DOMContentLoaded", function () {
     calculateTotals();
  
     /**
-     * Refresh handler - redirect to base URL
+     * Refresh handler - preserve admin order parameters
      */
     if (performance.getEntriesByType("navigation")[0].type === "reload") {
-        window.location.href = window.location.pathname;
+        // Check if this is an admin order (has required query params)
+        const urlParams = new URLSearchParams(window.location.search);
+        const isAdmin = urlParams.get('is_admin');
+        const hasSignature = urlParams.get('signature');
+        
+        // Only redirect to clean URL if NOT an admin order
+        if (!isAdmin || !hasSignature) {
+            window.location.href = window.location.pathname;
+        }
+        // For admin orders, keep the URL parameters intact
     }
 });

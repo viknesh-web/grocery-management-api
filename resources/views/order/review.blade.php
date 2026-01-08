@@ -185,7 +185,7 @@
                 <!-- Hidden fields for admin context -->
                 @if($is_admin)
                     <input type="hidden" name="is_admin" value="1">
-                       <input type="hidden" name="admin_user_id" value="{{ $admin_user_id ?? '' }}">
+                    <input type="hidden" name="admin_user_id" value="{{ $admin_user_id ?? '' }}">
                     @if($selected_customer)
                         <input type="hidden" name="selected_customer_id" value="{{ $selected_customer->id }}">
                     @endif
@@ -251,8 +251,6 @@
                     >
                     <ul id="addressSuggestions" class="address-dropdown"></ul>
                 </div>
-                
-                <input type="hidden" name="grand_total" value="0">
                 
                 <div id="formErrors" style="display:none;"></div>
                 

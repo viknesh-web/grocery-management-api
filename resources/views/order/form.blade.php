@@ -7,101 +7,7 @@
         window.IS_ADMIN = @json($isAdmin ?? false);
         window.CUSTOMERS = @json($customers ?? []);
     </script>
-    <style>        
-        .admin-badge {
-            display: inline-block;
-            background: rgba(255,255,255,0.3);
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: bold;
-            letter-spacing: 1px;
-        }
-        .customer-selection-section {
-            background: #f8fafc;
-            border: 2px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-        .customer-selection-section h3 {
-            margin: 0 0 15px 0;
-            color: #1e293b;
-            font-size: 18px;
-        }
-        .customer-select-wrapper {
-            display: flex;
-            gap: 15px;
-            align-items: flex-start;
-        }
-        #customerSelectDropdown {
-            flex: 1;
-            max-width: 400px;
-            padding: 12px 15px;
-            font-size: 14px;
-            border: 2px solid #cbd5e1;
-            border-radius: 6px;
-            background: white;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        #customerSelectDropdown:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-        #customerSelectDropdown option {
-            padding: 10px;
-        }
-        .customer-info-display {
-            flex: 1;
-            background: white;
-            border: 1px solid #e2e8f0;
-            border-radius: 6px;
-            padding: 15px;
-            display: none;
-        }
-        .customer-info-display.active {
-            display: block;
-        }
-        .customer-info-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-        }
-        .customer-info-item {
-            display: flex;
-            flex-direction: column;
-        }
-        .customer-info-label {
-            font-size: 11px;
-            font-weight: 600;
-            color: #64748b;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 4px;
-        }
-        .customer-info-value {
-            font-size: 14px;
-            color: #1e293b;
-            font-weight: 500;
-        }
-        .clear-customer-btn {
-            padding: 8px 16px;
-            background: #ef4444;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-        }
-        .clear-customer-btn:hover {
-            background: #dc2626;
-            transform: translateY(-1px);
-        }
-    </style>
+  
 </head>
 <body>
     @vite([
@@ -109,14 +15,14 @@
         'resources/css/pages/orderform/index.css'
     ])
     <div class="order-wrapper">        
-        
+        @if($isAdmin)
         <!-- Customer Selection Section (Admin Only) -->
         <div class="customer-selection-section">
             <h3>Select Customer</h3>
             <div class="customer-select-wrapper">
                 <div style="flex: 1;">
                     <select id="customerSelectDropdown" name="selected_customer_id">
-                        <option value="">-- Create order for new customer --</option>
+                        <option value=""> Create order for new customer </option>
                         @foreach($customers as $customer)
                         <option 
                             value="{{ $customer['id'] }}"
