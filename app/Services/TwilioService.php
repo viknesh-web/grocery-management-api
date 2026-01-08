@@ -10,13 +10,6 @@ use Twilio\Exceptions\RestException;
 /**
  * Twilio Service
  * 
- * Handles all Twilio API interactions.
- * 
- * Responsibilities:
- * - Twilio client initialization
- * - Message sending via Twilio API
- * - Twilio-specific error handling
- * - Error code mapping to user-friendly messages
  */
 class TwilioService
 {
@@ -30,46 +23,22 @@ class TwilioService
             config('services.twilio.auth_token')
         );
 
-        // Ensure WhatsApp number has the correct format
         $whatsappNumber = config('services.twilio.whatsapp_number');
         if (!str_starts_with($whatsappNumber, 'whatsapp:')) {
-            // Keep the + sign, Twilio WhatsApp requires whatsapp:+14155238886 format
             $whatsappNumber = 'whatsapp:' . $whatsappNumber;
         }
         $this->whatsappNumber = $whatsappNumber;
     }
 
-    /**
-     * Get the configured WhatsApp number.
-     *
-     * @return string
-     */
     public function getWhatsAppNumber(): string
     {
         return $this->whatsappNumber;
     }
-
-    /**
-     * Send a WhatsApp message via Twilio API.
-     * 
-     * Handles:
-     * - Message creation via Twilio API
-     * - Template vs plain text messages
-     * - Media attachments (PDFs)
-     * - Twilio-specific error handling
-     *
-     * @param string $toNumber Recipient WhatsApp number (formatted with whatsapp: prefix)
-     * @param array $messageData Message data (body, contentSid, contentVariables, mediaUrl)
-     * @return array Twilio message response with sid and status
-     * @throws ServiceException
-     */
+ 
     public function sendWhatsAppMessage(string $toNumber, array $messageData): array
     {
         try {
-            // Ensure 'from' is set
             $messageData['from'] = $messageData['from'] ?? $this->whatsappNumber;
-
-            // Send message via Twilio API
             $message = $this->client->messages->create($toNumber, $messageData);
 
             return [
@@ -105,14 +74,6 @@ class TwilioService
         }
     }
 
-    /**
-     * Map Twilio error codes to user-friendly error messages.
-     * 
-     * Business logic: Translates technical Twilio errors to user-friendly messages.
-     *
-     * @param RestException $e
-     * @return string User-friendly error message
-     */
     protected function mapTwilioError(RestException $e): string
     {
         $errorCode = $e->getCode();
@@ -126,14 +87,7 @@ class TwilioService
             default => 'Failed to send WhatsApp message. Please try again later.',
         };
     }
-
-    /**
-     * Validate Twilio configuration.
-     * 
-     * Checks if Twilio credentials are configured.
-     *
-     * @return bool
-     */
+  
     public function isConfigured(): bool
     {
         return !empty(config('services.twilio.account_sid')) &&

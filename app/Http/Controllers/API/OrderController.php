@@ -10,7 +10,9 @@ use App\Repositories\OrderRepository;
 use App\Services\OrderService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\URL;
 
 /**
  * Order Controller
@@ -214,6 +216,37 @@ class OrderController extends Controller
                 'customer_id' => $customerId,
             ]);
             return ApiResponse::error('Failed to load customer orders', null, 500);
+        }
+    }
+
+     public function generateOrderUrl(Request $request): JsonResponse
+    {
+        try {
+            //$user = $request->user();
+            $user = Auth::user();
+                Log::info( $user);
+            // Check if user is master/admin
+            if (!$user || !$user->master) {
+                return ApiResponse::forbidden('Only admin users can create orders for customers');
+            }
+            
+            // Generate signed URL that expires in 1 hour
+            $signedUrl = URL::temporarySignedRoute(
+                'order.form',
+                now()->addHour(),
+                [
+                    'is_admin' => 1,
+                    'admin_user_id' => $user->id,
+                ]
+            );
+            
+            return ApiResponse::success([
+                'url' => $signedUrl,
+                'expires_at' => now()->addHour()->toIso8601String(),
+            ]);
+            
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to generate order URL', null, 500);
         }
     }
 }

@@ -233,4 +233,10 @@ class CustomerRepository extends BaseRepository
     {
         return Customer::where('whatsapp_number', $phone)->first();
     }
+
+    public function query(): Builder
+    {
+        $model = $this->model();
+        return $model::query();
+    }
 }

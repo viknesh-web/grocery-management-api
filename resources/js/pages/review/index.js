@@ -157,11 +157,7 @@ function validateOrderForm(form) {
         showFieldError(form.whatsapp, 'Enter a valid UAE WhatsApp number');
     }
 
-    // Email validation (optional)
-    if (!email) {
-        showFieldError(form.email, 'Email is required');
-    }
-    else if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         showFieldError(form.email, 'Enter a valid email address');
     }
 

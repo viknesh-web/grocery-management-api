@@ -6,12 +6,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 
-/**
- * Repository Interface
- * 
- * Defines the contract for all repository implementations.
- * Ensures consistent API across all repositories.
- */
+
 interface RepositoryInterface
 {
     /**

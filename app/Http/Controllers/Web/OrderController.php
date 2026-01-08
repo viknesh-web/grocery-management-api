@@ -7,6 +7,8 @@ use App\Exceptions\ValidationException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Order\ConfirmOrderRequest;
 use App\Models\Product;
+use App\Models\User;
+use App\Repositories\CustomerRepository;
 use App\Services\AddressService;
 use App\Services\CartService;
 use App\Services\OrderPdfService;
@@ -15,15 +17,16 @@ use App\Services\PriceCalculator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\URL;
 
 /**
- * Order Controller - Updated for CartService Integration
+ * Order Controller - Using Signed URLs (No Token Storage Required)
  * 
- * Changes from original:
- * - Added CartService and PriceCalculator dependencies
- * - Replaced session-based review with cart-based review
- * - Pass UNIT_CONVERSIONS to views (not directly in JS)
- * - Cleaner error handling
+ * APPROACH 1: SIGNED URLS (RECOMMENDED)
+ * - No database token storage needed
+ * - Secure with signature validation
+ * - Time-limited access
+ * - Perfect for cross-domain
  */
 class OrderController extends Controller
 {
@@ -32,13 +35,14 @@ class OrderController extends Controller
         private OrderPdfService $pdfService,
         private AddressService $addressService,
         private CartService $cartService,
-        private PriceCalculator $priceCalculator
+        private PriceCalculator $priceCalculator,
+        private CustomerRepository $customerRepository
     ) {}
 
     /**
      * Show order form.
      * 
-     * UPDATED: Pass UNIT_CONVERSIONS to view
+     * UPDATED: Uses signed URL validation instead of token
      */
     public function index(Request $request)
     {
@@ -46,21 +50,74 @@ class OrderController extends Controller
             $formData = $this->orderService->getFormData();
             $selectedQty = $this->orderService->getReviewQuantities();
             
-            // Clear cart if not coming from review page
             if (!$this->orderService->isFromReview($request->get('from'))) {
                 $this->orderService->clearSession();
                 $selectedQty = [];
             }
             
-            // UPDATED: Pass unit conversions to view
             $unitConversions = Product::UNIT_CONVERSIONS;
+            
+            // Check if this is an admin order creation
+            $isAdmin = $request->boolean('is_admin', false);
+            $adminUserId = $request->get('admin_user_id');
+            $signature = $request->get('signature');
+            $adminUser = null;
+            $customers = [];
+            
+            if ($isAdmin && $adminUserId && $signature) {
+                // Validate signed URL
+                if ($request->hasValidSignature()) {
+                    // Load admin user
+                    $adminUser = User::find((int) $adminUserId);
+                    
+                    if ($adminUser && $adminUser->master) {
+                        // Load active customers for dropdown
+                        $customers = $this->customerRepository->query()
+                            ->where('status', 'active')
+                            ->select('id', 'name', 'whatsapp_number', 'address')
+                            ->orderBy('name', 'asc')
+                            ->get()
+                            ->map(function ($customer) {
+                                return [
+                                    'id' => $customer->id,
+                                    'name' => $customer->name,
+                                    'phone' => $customer->whatsapp_number,
+                                    'address' => $customer->address ?? '',
+                                ];
+                            });
+                        
+                        Log::info('Admin order creation initiated (signed URL)', [
+                            'admin_id' => $adminUser->id,
+                            'admin_email' => $adminUser->email,
+                            'customers_count' => $customers->count(),
+                        ]);
+                    } else {
+                        $isAdmin = false;
+                        Log::warning('Admin user not found or not master', [
+                            'user_id' => $adminUserId,
+                        ]);
+                    }
+                } else {
+                    // Invalid or expired signature
+                    $isAdmin = false;
+                    Log::warning('Invalid or expired signed URL');
+                }
+            }
             
             return view('order.form', array_merge($formData, [
                 'selectedQty' => $selectedQty,
-                'unitConversions' => $unitConversions, // ← Pass to view
+                'unitConversions' => $unitConversions,
+                'isAdmin' => $isAdmin,
+                'adminUserId' => $adminUserId,
+                'adminUser' => $adminUser,
+                'customers' => $customers,
             ]));
+            
         } catch (\Exception $e) {
-            Log::error('Failed to load order form', ['error' => $e->getMessage()]);
+            Log::error('Failed to load order form', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             return redirect()->route('order.form')
                 ->with('error', 'Unable to load order form. Please try again.');
         }
@@ -68,13 +125,23 @@ class OrderController extends Controller
 
     /**
      * Process review (form submission).
-     * 
-     * UPDATED: Now uses CartService instead of session
      */
     public function review(Request $request)
     {
         try {
-            // Process and save to cart (returns cart ID)
+            if ($request->boolean('is_admin')) {
+                session([
+                    'admin_order' => true,
+                    'admin_user_id' => $request->get('admin_user_id'),
+                    'selected_customer_id' => $request->get('selected_customer_id'),
+                ]);
+                
+                Log::info('Admin order review', [
+                    'admin_user_id' => $request->get('admin_user_id'),
+                    'selected_customer_id' => $request->get('selected_customer_id'),
+                ]);
+            }
+            
             $this->orderService->processReview($request->products ?? []);
             
             return redirect()->route('order.review.show');
@@ -93,13 +160,10 @@ class OrderController extends Controller
 
     /**
      * Show review page.
-     * 
-     * UPDATED: Gets products from CartService
      */
     public function showReview()
     {
         try {
-            // Get products from cart (fresh from DB)
             $products = $this->orderService->getReviewProducts();
             
             if ($products->isEmpty()) {
@@ -107,7 +171,27 @@ class OrderController extends Controller
                     ->with('error', 'Cart is empty. Please add products.');
             }
             
-            return view('order.review', compact('products'));
+            $isAdmin = session('admin_order', false);
+            $adminUserId = session('admin_user_id');
+            $selectedCustomerId = session('selected_customer_id');
+            
+            $selectedCustomer = null;
+            
+            if ($isAdmin && $selectedCustomerId) {
+                $selectedCustomer = $this->customerRepository->find((int) $selectedCustomerId);
+                
+                Log::info('Loading selected customer for admin order', [
+                    'customer_id' => $selectedCustomerId,
+                    'customer_found' => $selectedCustomer ? true : false,
+                ]);
+            }
+            
+            return view('order.review', [
+                'products' => $products,
+                'is_admin' => $isAdmin,
+                'admin_user_id' => $adminUserId,
+                'selected_customer' => $selectedCustomer,
+            ]);
             
         } catch (ValidationException $e) {
             return redirect()->route('order.form')
@@ -121,13 +205,10 @@ class OrderController extends Controller
 
     /**
      * Download PDF of order.
-     * 
-     * UPDATED: Gets products from CartService
      */
     public function downloadPdf(Request $request)
     {
         try {
-            // Get products from cart (not session)
             $products = $this->orderService->getReviewProducts();
             
             if ($products->isEmpty()) {
@@ -152,15 +233,12 @@ class OrderController extends Controller
 
     /**
      * Confirm order (AJAX endpoint).
-     * 
-     * UPDATED: Gets products from CartService
      */
     public function confirm(ConfirmOrderRequest $request): JsonResponse
     {
         try {
             $validated = $request->validated();
             
-            // Get products from cart (not session)
             $products = $this->orderService->getReviewProducts();
             
             if ($products->isEmpty()) {
@@ -170,20 +248,42 @@ class OrderController extends Controller
                 ], 400);
             }
             
-            // Prepare order data
             $orderData = [
                 'customer_name' => $validated['customer_name'],
                 'customer_email' => $validated['email'] ?? null,
                 'customer_phone' => $validated['whatsapp'],
                 'customer_address' => $validated['address'],
-                'products' => $products, // Pass collection (OrderService handles it)
+                'products' => $products,
                 'grand_total' => $validated['grand_total'],
             ];
             
-            // Create order (cart is cleared automatically inside service)
+            // Check if this is an admin order
+            $isAdmin = $request->boolean('is_admin', false);
+            $adminUserId = $request->get('admin_user_id');
+            $selectedCustomerId = $request->get('selected_customer_id');
+            
+            if ($isAdmin && $adminUserId) {
+                // Validate admin user
+                $adminUser = User::find((int) $adminUserId);
+                
+                if ($adminUser && $adminUser->master) {
+                    $orderData['created_by_admin'] = $adminUser->id;
+                    
+                    if ($selectedCustomerId) {
+                        $orderData['customer_id'] = (int) $selectedCustomerId;
+                    }
+                    
+                    Log::info('Admin order confirmation', [
+                        'admin_id' => $adminUser->id,
+                        'selected_customer_id' => $selectedCustomerId,
+                    ]);
+                }
+            }
+            
             $order = $this->orderService->createFromWebForm($orderData);
             
-            // Store order ID for confirmation page
+            session()->forget(['admin_order', 'admin_user_id', 'selected_customer_id']);
+            
             $this->orderService->saveConfirmationToSession([
                 'order_id' => $order->id,
             ]);
@@ -213,11 +313,6 @@ class OrderController extends Controller
         }
     }
 
-    /**
-     * Show order confirmation page.
-     * 
-     * UNCHANGED - works as before
-     */
     public function showConfirmation()
     {
         try {
@@ -228,7 +323,6 @@ class OrderController extends Controller
                     ->with('error', 'No order confirmation found. Please start a new order.');
             }
 
-            // Get order with customer from database
             $order = $this->orderService->find($sessionData['order_id']);
 
             if (!$order) {
@@ -236,7 +330,6 @@ class OrderController extends Controller
                     ->with('error', 'Order not found. Please start a new order.');
             }
 
-            // Prepare data for view
             $data = [
                 'order_number' => $order->order_number,
                 'order_id' => $order->id,
@@ -256,11 +349,6 @@ class OrderController extends Controller
         }
     }
 
-    /**
-     * Search UAE addresses (AJAX endpoint).
-     * 
-     * UNCHANGED - works as before
-     */
     public function searchAddress(Request $request): JsonResponse
     {
         try {

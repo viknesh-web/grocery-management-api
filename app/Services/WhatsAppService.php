@@ -12,21 +12,6 @@ use Illuminate\Support\Facades\Log;
 /**
  * WhatsApp Service
  * 
- * Handles all business logic for WhatsApp operations.
- * 
- * Responsibilities:
- * - Business logic orchestration
- * - Customer selection and filtering
- * - PDF generation coordination (delegated to PdfService)
- * - Message preparation and formatting
- * - Batch operations
- * - Job dispatching
- * - Phone number normalization (via PhoneNumberHelper)
- * 
- * Does NOT contain:
- * - Direct Twilio API calls (delegated to TwilioService)
- * - Direct customer queries (uses CustomerRepository)
- * - PDF generation logic (delegated to PdfService)
  */
 class WhatsAppService
 {
@@ -36,27 +21,6 @@ class WhatsAppService
         private CustomerRepository $customerRepository
     ) {}
 
-    /**
-     * Send price list to customers.
-     * 
-     * Handles:
-     * - PDF generation (delegated to PdfService)
-     * - Customer selection (via CustomerRepository)
-     * - Batch job dispatching (if async)
-     * - Synchronous sending (if not async)
-     * - Message preparation
-     *
-     * @param array|null $customerIds Specific customer IDs (null = all active customers)
-     * @param string|null $customMessage Custom message text
-     * @param bool $includePdf Whether to include PDF
-     * @param array|null $productIds Product IDs for PDF generation
-     * @param string|null $templateId Twilio Content Template ID
-     * @param array|null $contentVariables Variables for Content Template
-     * @param string|null $customPdfUrl Custom PDF URL (if uploaded)
-     * @param string $pdfLayout PDF layout ('regular' or 'catalog')
-     * @param bool $async Whether to send asynchronously
-     * @return array Result array with status, message, and results
-     */
     public function sendPriceListToCustomers(
         ?array $customerIds = null,
         ?string $customMessage = null,
@@ -68,13 +32,11 @@ class WhatsAppService
         string $pdfLayout = 'regular',
         bool $async = true
     ): array {
-        // Generate PDF if needed (business logic - determine when to generate)
         $pdfUrl = null;
         if ($includePdf) {
             $pdfUrl = $this->preparePdfUrl($customPdfUrl, $productIds, $pdfLayout);
         }
 
-        // If async, dispatch batch job (business logic - async vs sync)
         if ($async) {
             return $this->dispatchBatchJob(
                 $customerIds,
@@ -94,25 +56,7 @@ class WhatsAppService
             $contentVariables
         );
     }
-
-    /**
-     * Send a WhatsApp message to a single customer.
-     * 
-     * Handles:
-     * - Phone number normalization (via PhoneNumberHelper)
-     * - Message preparation (template vs plain text)
-     * - Twilio API call (delegated to TwilioService)
-     * - Error handling and logging
-     *
-     * @param Customer $customer
-     * @param string|null $message Plain text message
-     * @param string|null $pdfUrl PDF URL to attach
-     * @param string|null $templateId Twilio Content Template ID
-     * @param array|null $contentVariables Variables for Content Template
-     * @return array Result array with success status, message_sid, and status
-     * @throws ValidationException If phone number is invalid
-     * @throws ServiceException If message sending fails
-     */
+  
     public function sendMessage(
         Customer $customer,
         ?string $message = null,
@@ -141,8 +85,6 @@ class WhatsAppService
                 'template_id' => $templateId,
             ]);
 
-            // Prepare message data (business logic - message formatting)
-            // Replace {{name}} placeholder with customer name if message is provided
             $processedMessage = $message ? str_replace('{{name}}', $customer->name, $message) : null;
             
             $messageData = $this->prepareMessageData(
@@ -194,29 +136,11 @@ class WhatsAppService
         }
     }
 
-    /**
-     * Validate WhatsApp number format.
-     * 
-     * Delegates to PhoneNumberHelper for validation.
-     *
-     * @param string $number
-     * @return bool
-     */
     public function validateWhatsAppNumber(string $number): bool
     {
         return PhoneNumberHelper::validate($number);
     }
 
-    /**
-     * Prepare PDF URL for sending.
-     * 
-     * Business logic: Determines whether to use custom PDF or generate new one.
-     *
-     * @param string|null $customPdfUrl
-     * @param array|null $productIds
-     * @param string $pdfLayout
-     * @return string|null
-     */
     protected function preparePdfUrl(?string $customPdfUrl, ?array $productIds, string $pdfLayout): ?string
     {
         if ($customPdfUrl !== null) {
@@ -229,18 +153,6 @@ class WhatsAppService
         return $this->pdfService->getPdfUrl($pdfPath);
     }
 
-    /**
-     * Dispatch batch job for async sending.
-     * 
-     * Business logic: Queues messages for background processing.
-     *
-     * @param array|null $customerIds
-     * @param string|null $customMessage
-     * @param string|null $pdfUrl
-     * @param string|null $templateId
-     * @param array|null $contentVariables
-     * @return array
-     */
     protected function dispatchBatchJob(
         ?array $customerIds,
         ?string $customMessage,
@@ -267,19 +179,7 @@ class WhatsAppService
             'customer_count' => $customerCount,
         ];
     }
-
-    /**
-     * Send messages to customers synchronously.
-     * 
-     * Business logic: Processes customers in chunks and sends messages.
-     *
-     * @param array|null $customerIds
-     * @param string|null $customMessage
-     * @param string|null $pdfUrl
-     * @param string|null $templateId
-     * @param array|null $contentVariables
-     * @return array
-     */
+ 
     protected function sendToCustomersSynchronously(
         ?array $customerIds,
         ?string $customMessage,
@@ -289,8 +189,6 @@ class WhatsAppService
     ): array {
         $results = [];
         
-        // Process customers in chunks to avoid memory issues (business logic - chunking)
-        // Use query builder chunking for memory efficiency
         if ($customerIds === null || empty($customerIds)) {
             // Send to all active customers in chunks
             Customer::where('status', 'active')
@@ -308,19 +206,6 @@ class WhatsAppService
         return $results;
     }
 
-    /**
-     * Process a chunk of customers and send messages.
-     * 
-     * Business logic: Handles individual customer sending with error handling.
-     *
-     * @param \Illuminate\Support\Collection $customers
-     * @param array $results Reference to results array
-     * @param string|null $customMessage
-     * @param string|null $pdfUrl
-     * @param string|null $templateId
-     * @param array|null $contentVariables
-     * @return void
-     */
     protected function processCustomerChunk(
         \Illuminate\Support\Collection $customers,
         array &$results,
@@ -354,19 +239,6 @@ class WhatsAppService
         }
     }
 
-    /**
-     * Prepare message data for Twilio API.
-     * 
-     * Business logic: Formats message data based on template vs plain text.
-     *
-     * @param string|null $message Plain text message (with {{name}} already replaced)
-     * @param string|null $templateId Twilio Content Template ID
-     * @param array|null $contentVariables Variables for Content Template
-     * @param string|null $pdfUrl PDF URL to attach
-     * @param string $fromNumber Sender WhatsApp number
-     * @param string|null $customerName Customer name for default message replacement
-     * @return array Message data for Twilio API
-     */
     protected function prepareMessageData(
         ?string $message,
         ?string $templateId,

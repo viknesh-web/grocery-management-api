@@ -45,7 +45,6 @@ class ConfirmOrderRequest extends FormRequest
                     }
                 }
             ],
-            'grand_total' => ['required', 'numeric', 'min:1'],
         ];
     }
 
@@ -64,9 +63,6 @@ class ConfirmOrderRequest extends FormRequest
             'address.required' => 'Please provide your delivery address',
             'address.min' => 'Address must be at least 2 characters',
             'email.email' => 'Please provide a valid email address',
-            'grand_total.required' => 'Grand total is required',
-            'grand_total.numeric' => 'Grand total must be a valid number',
-            'grand_total.min' => 'Grand total must be at least 1',
         ];
     }
 }
