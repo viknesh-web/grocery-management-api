@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Repositories\CategoryRepository;
 use App\Repositories\CustomerRepository;
+use App\Repositories\OrderRepository;
 use App\Repositories\PriceUpdateRepository;
 use App\Repositories\ProductRepository;
 use Illuminate\Support\Carbon;
@@ -18,7 +19,8 @@ class DashboardService
         private ProductRepository $productRepository,
         private CategoryRepository $categoryRepository,
         private CustomerRepository $customerRepository,
-        private PriceUpdateRepository $priceUpdateRepository
+        private PriceUpdateRepository $priceUpdateRepository,
+        private OrderRepository $orderRepository
     ) {}
  
     public function getStatistics(): array
@@ -31,6 +33,8 @@ class DashboardService
         $productTypeStats = $this->getProductTypeStatistics();
         $recentPriceChanges = $this->getRecentPriceChanges();
 
+        $recentOrders = $this->getOrders();
+
         return [
             'statistics' => [
                 'products' => $productStats,
@@ -41,6 +45,13 @@ class DashboardService
                 'product_types' => $productTypeStats,
             ],
             'recent_price_changes' => $recentPriceChanges,
+            'recent_orders' => $recentOrders,
+            'charts' => [
+                'orders_last_7_days' => $this->getOrdersLast7Days(),
+                'orders_monthly' => $this->getOrdersMonthly(),
+                'order_summary' => $this->getOrderSummary(),
+                
+            ],
         ];
     }
    
@@ -120,5 +131,79 @@ class DashboardService
         $relations = ['product'];
         return $this->priceUpdateRepository->getRecent($limit, $relations);
     }
+
+    protected function getOrders(int $limit = 6): \Illuminate\Database\Eloquent\Collection
+    {
+        return $this->orderRepository->getOrder($limit);
+    }
+
+    protected function getOrdersLast7Days(): array
+    {
+        $data = [];
+        $labels = [];
+        
+        // Get last 7 days
+        for ($i = 6; $i >= 0; $i--) {
+            $date = Carbon::now()->subDays($i);
+            $dayName = $date->format('D'); // Mon, Tue, Wed, etc.
+            
+            $total = $this->orderRepository->getTotalByDate($date->toDateString());
+            
+            $labels[] = $dayName;
+            $data[] = (float) $total;
+        }
+
+        return [
+            'labels' => $labels,
+            'data' => $data,
+        ];
+    }
+
+    protected function getOrdersMonthly(): array
+    {
+        $labels = [];
+        $data = [];
+
+        // Last 12 months
+        for ($i = 11; $i >= 0; $i--) {
+            $date = Carbon::now()->subMonths($i);
+
+            $labels[] = $date->format('M Y'); // Jan 2025
+
+            $data[] = (float) $this->orderRepository->getTotalByMonth($date->year, $date->month);
+        }
+
+        return [
+            'labels' => $labels,
+            'data' => $data,
+        ];
+    }
+
+    protected function getOrderSummary(): array
+    { 
+        $data = [];
+        $labels = [];
+
+        // Get last 7 days
+        for ($i = 6; $i >= 0; $i--) {
+            $date = Carbon::now()->subDays($i);
+            $dayName = $date->format('D');
+
+            $total = $this->orderRepository
+                ->getTotalAmountByDate($date->toDateString());
+
+            $labels[] = $dayName;
+            $data[] = (float) $total;
+        }
+
+        $totalOrders = array_sum($data);
+
+        return [
+            'labels' => $labels,
+            'data' => $data,
+            'total' => $totalOrders,
+        ];
+    }
+
 }
 
