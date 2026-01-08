@@ -262,14 +262,8 @@
             <div id="noProductsMsg" style="display:none;text-align:center;padding:40px;font-size:16px;color:#6b7280;font-weight:500;">
                 No products found.
             </div>
-<<<<<<< HEAD
-            
-            <!-- Grand Total -->
-            <table style="margin-top:10px;" class="grand-total">
-=======
             <!-- GRAND TOTAL -->
             <table class="grand-total">
->>>>>>> 8042dd51e2c1a6391f084e1adda840f7c9d50772
                 <tfoot>
                     <tr class="grand-total">
                         <td colspan="5" align="right">Grand Total</td>
