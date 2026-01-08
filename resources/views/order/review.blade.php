@@ -70,35 +70,7 @@
                 @endif
             </h2>
         </div>
-        
-        <!-- Show selected customer details if admin selected one -->
-        @if($is_admin && $selected_customer)
-        <div class="selected-customer-banner">
-            <h3>
-                 Customer Selected
-            </h3>
-            <div class="customer-details-grid">
-                <div class="customer-detail-item">
-                    <span class="customer-detail-label">Customer Name</span>
-                    <span class="customer-detail-value">{{ $selected_customer->name }}</span>
-                </div>
-                <div class="customer-detail-item">
-                    <span class="customer-detail-label">WhatsApp Number</span>
-                    <span class="customer-detail-value">{{ $selected_customer->whatsapp_number }}</span>
-                </div>
-                <div class="customer-detail-item">
-                    <span class="customer-detail-label">Email</span>
-                    <span class="customer-detail-value">{{ $selected_customer->email ?? 'Not provided' }}</span>
-                </div>
-                <div class="customer-detail-item">
-                    <span class="customer-detail-label">Delivery Address</span>
-                    <span class="customer-detail-value">{{ $selected_customer->address ?? 'Not provided' }}</span>
-                </div>
-            </div>
-        </div>
-        @endif
-        
-        <!-- Products Table -->
+        <div class="table-scroll">
         <table>
             <thead>
                 <tr>
@@ -160,8 +132,8 @@
                 @endforeach
             </tbody>
         </table>
-        
-        <!-- Grand Total -->
+    </div>
+        <!-- GRAND TOTAL -->
         <div class="grand-total">
             Grand Total: 
             <img src="{{ asset('assets/images/Dirham-Symbol-grey.png') }}" width="12" height="12" style="padding: 8px 5px 0px 10px;"> 
