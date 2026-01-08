@@ -16,6 +16,7 @@ return new class extends Migration
             $table->string('name', 255);
             $table->string('whatsapp_number', 20)->unique();
             $table->text('address')->nullable();
+            $table->string('email')->unique();
             $table->string('landmark', 255)->nullable();
             $table->text('remarks')->nullable();
             $table->enum('status', ['active', 'inactive'])->default('active');
