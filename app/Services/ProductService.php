@@ -2,25 +2,30 @@
 
 namespace App\Services;
 
+use App\Exceptions\BusinessException;
 use App\Models\Product;
+use App\Repositories\CategoryRepository;
 use App\Repositories\PriceUpdateRepository;
 use App\Repositories\ProductRepository;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\UploadedFile;
 
-
+/**
+ * Product Service - Updated with Category Status Check
+ */
 class ProductService extends BaseService
 {
     public function __construct(
         private ProductRepository $repository,
         private PriceUpdateRepository $priceUpdateRepository,
+        private CategoryRepository $categoryRepository,
         private ImageService $imageService
     ) {}
 
     public function getPaginated(array $filters = [], int $perPage = 15): \Illuminate\Contracts\Pagination\LengthAwarePaginator
     {
-        $relations = ['category:id,name'];
+        $relations = ['category:id,name,status'];
         $products = $this->repository->paginate($filters, $perPage, $relations);
         $totalFiltered = $this->repository->countByFilters($filters);
         $filtersApplied = array_filter($filters, fn($value) => !empty($value));
@@ -34,7 +39,7 @@ class ProductService extends BaseService
     {
         return $this->handle(function () use ($id) {
             $relations = [
-                'category:id,name'
+                'category:id,name,status'
             ];
             
             return $this->repository->find($id, $relations);
@@ -45,7 +50,7 @@ class ProductService extends BaseService
     {
         return $this->handle(function () use ($id) {
             $relations = [
-                'category:id,name'
+                'category:id,name,status'
             ];
             
             return $this->repository->findOrFail($id, $relations);
@@ -55,6 +60,11 @@ class ProductService extends BaseService
     public function create(array $data, ?UploadedFile $image, int $userId): Product
     {
         return $this->transaction(function () use ($data, $image, $userId) {
+            // Check if category is active (if category_id is provided)
+            if (isset($data['category_id'])) {
+                $this->validateCategoryStatus($data['category_id'], $data['status'] ?? 'active');
+            }
+
             if ($image) {
                 $data['image'] = $this->imageService->uploadProductImage($image);
             }
@@ -70,7 +80,13 @@ class ProductService extends BaseService
   
     public function update(Product $product, array $data, ?UploadedFile $image, bool $imageRemoved, int $userId): Product
     {
-        return $this->transaction(function () use ($product, $data, $image, $imageRemoved, $userId) {         
+        return $this->transaction(function () use ($product, $data, $image, $imageRemoved, $userId) {
+            // Check if trying to activate product with inactive category
+            if (isset($data['status']) && $data['status'] === 'active') {
+                $categoryId = $data['category_id'] ?? $product->category_id;
+                $this->validateCategoryStatus($categoryId, 'active');
+            }
+
             $oldValues = $this->getOldProductValues($product);
             $data = $this->handleImageUpdate($product, $data, $image, $imageRemoved);
             $data = $this->prepareProductData($data, $userId, $product);
@@ -100,10 +116,23 @@ class ProductService extends BaseService
         }, 'Failed to delete product');
     }
 
+    /**
+     * Toggle product status with category validation.
+     *
+     * @param Product $product
+     * @param int $userId
+     * @return Product
+     * @throws BusinessException if trying to activate product with inactive category
+     */
     public function toggleStatus(Product $product, int $userId): Product
     {
         return $this->transaction(function () use ($product, $userId) {       
             $newStatus = $product->status === 'active' ? 'inactive' : 'active';
+            
+            // If trying to activate, check category status
+            if ($newStatus === 'active') {
+                $this->validateCategoryStatus($product->category_id, 'active');
+            }
             
             $product = $this->repository->update($product, [
                 'status' => $newStatus,
@@ -114,6 +143,37 @@ class ProductService extends BaseService
 
             return $product;
         }, 'Failed to toggle product status');
+    }
+
+    /**
+     * Validate category status before activating product.
+     *
+     * @param int $categoryId
+     * @param string $desiredProductStatus
+     * @throws BusinessException if category is inactive
+     */
+    private function validateCategoryStatus(int $categoryId, string $desiredProductStatus): void
+    {
+        if ($desiredProductStatus !== 'active') {
+            return; // No validation needed for inactive products
+        }
+
+        $category = $this->categoryRepository->find($categoryId);
+
+        if (!$category) {
+            throw new BusinessException('Category not found');
+        }
+
+        if ($category->status !== 'active') {
+            throw new BusinessException(
+                "Cannot activate product. Category '{$category->name}' is inactive. Please activate the category first.",
+                [
+                    'category_id' => $category->id,
+                    'category_name' => $category->name,
+                    'category_status' => $category->status,
+                ]
+            );
+        }
     }
 
     protected function prepareProductData(array $data, int $userId, ?Product $product = null): array
@@ -161,7 +221,6 @@ class ProductService extends BaseService
             $oldValue = $oldValues[$field] ?? null;
             $newValue = $newData[$field] ?? $product->getAttribute($field);
 
-            // Handle numeric comparison
             if (is_numeric($oldValue) && is_numeric($newValue)) {
                 if ((float) $oldValue !== (float) $newValue) {
                     return true;
@@ -173,6 +232,7 @@ class ProductService extends BaseService
 
         return false;
     }
+
     protected function getFinalNewValues(array $oldValues, array $newData): array
     {
         return [
@@ -214,7 +274,6 @@ class ProductService extends BaseService
         ]);
     }
 
-  
     protected function calculateSellingPrice(?float $regularPrice, string $discountType, ?float $discountValue): float
     {
         if ($regularPrice === null || $regularPrice <= 0) {
@@ -226,17 +285,15 @@ class ProductService extends BaseService
 
         if ($discountType === 'percentage') {
             $discountAmount = $regularPrice * ($discountValue / 100);
-        } else { // fixed
+        } else {
             $discountAmount = $discountValue;
         }
 
         $sellingPrice = $regularPrice - $discountAmount;
 
-        // Ensure price is not negative
         return max(0, round((float) $sellingPrice, 2));
     }
 
-  
     protected function clearModelCache(?Model $model = null, ?int $id = null): void
     {
         if ($model instanceof Product) {
@@ -265,7 +322,6 @@ class ProductService extends BaseService
    
     protected function afterDelete(Model $model): void
     {
-        // Clear product cache after deletion
         if ($model instanceof Product) {
             $this->clearModelCache($model);
         }

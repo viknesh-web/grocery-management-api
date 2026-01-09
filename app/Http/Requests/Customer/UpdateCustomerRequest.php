@@ -95,7 +95,6 @@ class UpdateCustomerRequest extends FormRequest
                 'required',
                 'string',
                 'regex:' . PhoneNumberHelper::getValidationRegex(),
-                Rule::unique('customers', 'whatsapp_number')->ignore($customerId),
             ],
             'landmark' => ['nullable', 'string', 'max:255'],
             'remarks' => ['nullable', 'string', 'max:1000'],

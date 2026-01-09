@@ -69,21 +69,23 @@ class CategoryRepository extends BaseRepository
     {
         $query = $this->query();
 
-        // Handle legacy 'active' filter conversion to 'status'
         if (isset($filters['active']) && !isset($filters['status'])) {
             $filters['status'] = filter_var($filters['active'], FILTER_VALIDATE_BOOLEAN) ? 'active' : 'inactive';
         }
 
-        // Apply filter scope (handles: search, status)
         $query->filter($filters);
 
-        // Eager load relations
         if (!empty($relations)) {
             $query->with($relations);
         }
 
-        // Apply sorting using model scope (ordered() sorts by name asc)
-        $query->ordered();
+        if (isset($filters['sort_by']) && !empty($filters['sort_by'])) {
+            $sortColumn = $filters['sort_by'];
+            $sortOrder = $filters['sort_order'] ?? 'asc';
+            $query->orderBy($sortColumn, $sortOrder);
+        } else {
+            $query->ordered();
+        }
 
         return $query;
     }

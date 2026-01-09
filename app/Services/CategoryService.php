@@ -9,9 +9,11 @@ use App\Repositories\ProductRepository;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
- * Category Service
+ * Category Service - Updated with Cascade Status
  */
 class CategoryService extends BaseService
 {
@@ -103,13 +105,41 @@ class CategoryService extends BaseService
         }, 'Failed to delete category');
     }
 
+    /**
+     * Toggle category status and cascade to products if becoming inactive.
+     *
+     * @param Category $category
+     * @param int $userId
+     * @return Category
+     */
     public function toggleStatus(Category $category, int $userId): Category
     {
         return $this->transaction(function () use ($category, $userId) {
-            $newStatus = $category->status === 'active' ? 'inactive' : 'active';            
+            $oldStatus = $category->status;
+            $newStatus = $oldStatus === 'active' ? 'inactive' : 'active';
+            
+            // Update category status
             $category = $this->repository->update($category, [
                 'status' => $newStatus,
             ]);
+
+            // If category is becoming INACTIVE, cascade to all products
+            if ($newStatus === 'inactive') {
+                $affectedProducts = $this->cascadeInactiveStatusToProducts($category->id);
+                
+                Log::info('Category status toggled to inactive with cascade', [
+                    'category_id' => $category->id,
+                    'category_name' => $category->name,
+                    'products_affected' => $affectedProducts,
+                    'user_id' => $userId,
+                ]);
+            } else {
+                Log::info('Category status toggled to active', [
+                    'category_id' => $category->id,
+                    'category_name' => $category->name,
+                    'user_id' => $userId,
+                ]);
+            }
 
             $this->clearModelCache($category);
 
@@ -117,6 +147,33 @@ class CategoryService extends BaseService
         }, 'Failed to toggle category status');
     }
 
+    /**
+     * Cascade inactive status to all products in the category.
+     *
+     * @param int $categoryId
+     * @return int Number of products affected
+     */
+    private function cascadeInactiveStatusToProducts(int $categoryId): int
+    {
+        // Get all active products in this category
+        $activeProducts = $this->productRepository->all([
+            'category_id' => $categoryId,
+            'status' => 'active'
+        ]);
+
+        if ($activeProducts->isEmpty()) {
+            return 0;
+        }
+
+        // Update all active products to inactive
+        $affectedCount = DB::table('products')
+            ->where('category_id', $categoryId)
+            ->where('status', 'active')
+            ->update(['status' => 'inactive']);
+      
+
+        return $affectedCount;
+    }
 
     public function reorder(array $categories): void
     {
@@ -140,7 +197,6 @@ class CategoryService extends BaseService
         $relations = ['category:id,name'];
         return $this->productRepository->getByCategory($category->id, $filters, $perPage, $relations);
     }
-
 
     protected function prepareCategoryData(array $data, int $userId, ?Category $category = null): array
     {
@@ -198,6 +254,4 @@ class CategoryService extends BaseService
     {
         CacheService::clearCategoryCache();
     }
-
- 
 }

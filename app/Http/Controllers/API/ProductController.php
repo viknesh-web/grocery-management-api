@@ -28,7 +28,9 @@ class ProductController extends Controller
     {
         try {
             $filters = $request->getFilters();
-            $perPage = $request->get('per_page', 15);
+            $pagination = $request->getPagination();
+            
+            $perPage = $pagination['per_page'];
             
             $products = $this->productService->getPaginated($filters, $perPage);
             

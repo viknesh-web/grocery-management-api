@@ -33,8 +33,9 @@ class CategoryController extends Controller
     {
         try {
             $filters = $request->getFilters();
-            $perPage = $request->get('per_page', 15);
-            
+            $pagination = $request->getPagination();            
+            $perPage = $pagination['per_page'];
+                
             $categories = $this->categoryService->getPaginated($filters, $perPage);
             
             return ApiResponse::paginated($categories);
@@ -174,6 +175,7 @@ class CategoryController extends Controller
     public function search(Request $request, string $query): JsonResponse
     {
         try {
+            
             $categories = $this->categoryService->search($query);
             
             return ApiResponse::success(

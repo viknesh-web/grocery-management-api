@@ -3,57 +3,89 @@
 namespace App\Http\Requests\Category;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 /**
- * Index Category Request
- * 
- * Validates query parameters for listing categories.
+ * Index Category Request - Updated to handle frontend query params
  */
 class IndexCategoryRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     *
-     * @return bool
-     */
     public function authorize(): bool
     {
-        return true; // Authorization handled by middleware
+        return true;
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
-     */
     public function rules(): array
     {
         return [
-            'search' => ['sometimes', 'max:255'],
-            'status' => ['sometimes', 'string', Rule::in(['active', 'inactive'])],
-            'active' => ['sometimes', 'boolean'], // Legacy filter, converted to status
-            'sort_by' => ['sometimes', 'string', Rule::in(['name', 'created_at'])],
-            'sort_order' => ['sometimes', 'string', Rule::in(['asc', 'desc'])],
-            'page' => ['sometimes', 'integer'],
-            'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
+            // Pagination (frontend or backend style)
+            'page' => 'sometimes|integer|min:1',
+            'limit' => 'sometimes|integer|min:1|max:100',
+            'per_page' => 'sometimes|integer|min:1|max:100',
+            
+            // Sorting (frontend or backend style)
+            'sort' => 'sometimes|nullable|string|in:asc,desc',
+            'orderby' => 'sometimes|string|nullable',
+            'sort_by' => 'sometimes|string|nullable',
+            'sort_order' => 'sometimes|string|in:asc,desc|nullable',
+            
+            // Filters
+            'search' => 'sometimes|string|max:255',
+            'query' => 'sometimes|string|max:255|nullable',
+            'status' => 'sometimes|string|in:active,inactive',
         ];
     }
 
     /**
-     * Get validated filters for service layer.
+     * Get filters normalized to backend format.
      *
      * @return array
      */
     public function getFilters(): array
     {
+        $filters = [];
+
+        // Accept either `query` or `search`
+        if ($this->filled('query')) {
+            $filters['search'] = $this->input('query');
+        } elseif ($this->filled('search')) {
+            $filters['search'] = $this->input('search');
+        }
+
+        // Status
+        if ($this->filled('status')) {
+            $filters['status'] = $this->input('status');
+        }
+
+        // Sorting
+        if ($this->filled('orderby')) {
+            $filters['sort_by'] = $this->input('orderby');
+        } elseif ($this->filled('sort_by')) {
+            $filters['sort_by'] = $this->input('sort_by');
+        }
+
+        if ($this->filled('sort')) {
+            $filters['sort_order'] = $this->input('sort');
+        } elseif ($this->filled('sort_order')) {
+            $filters['sort_order'] = $this->input('sort_order');
+        }
+
+        return $filters;
+    }
+
+
+    /**
+     * Get pagination parameters.
+     *
+     * @return array
+     */
+    public function getPagination(): array
+    {
+        $page = $this->input('page', 1);
+        $perPage = $this->input('limit') ?? $this->input('per_page', 15);
+
         return [
-            'search' => $this->get('search'),
-            'status' => $this->get('status'),
-            'active' => $this->get('active'), // Legacy support
-            'sort_by' => $this->get('sort_by', 'name'),
-            'sort_order' => $this->get('sort_order', 'asc'),
+            'page' => (int) $page,
+            'per_page' => (int) $perPage,
         ];
     }
 }
-

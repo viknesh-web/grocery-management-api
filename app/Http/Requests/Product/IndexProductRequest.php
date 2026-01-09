@@ -3,63 +3,111 @@
 namespace App\Http\Requests\Product;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
-/**
- * Index Product Request
- * 
- * Validates query parameters for listing products.
- */
 class IndexProductRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     *
-     * @return bool
-     */
     public function authorize(): bool
     {
-        return true; // Authorization handled by middleware
+        return true;
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
-     */
     public function rules(): array
     {
         return [
-            'search' => ['sometimes', 'max:255'],
-            'category_id' => ['sometimes', 'integer', 'exists:categories,id'],
-            'product_type' => ['sometimes', 'string', 'in:daily,standard'],
-            'status' => ['sometimes', 'string', Rule::in(['active', 'inactive'])],
-            'has_discount' => ['sometimes', 'boolean'],
-            'stock_status' => ['sometimes', 'string', 'in:in_stock,low_stock,out_of_stock'],
-            'sort_by' => ['sometimes', 'string', Rule::in(['name', 'regular_price', 'selling_price', 'stock_quantity', 'created_at', 'product_type'])],
-            'sort_order' => ['sometimes', 'string', Rule::in(['asc', 'desc'])],
-            'page' => ['sometimes', 'integer',],
-            'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
+            // Pagination (frontend or backend style)
+            'page' => 'sometimes|integer|min:1',
+            'limit' => 'sometimes|integer|min:1|max:100',
+            'per_page' => 'sometimes|integer|min:1|max:100',
+            
+            // Sorting (frontend or backend style)
+            'sort' => 'sometimes|string|in:asc,desc|nullable',
+            'orderby' => 'sometimes|string|nullable',
+            'sort_by' => 'sometimes|string|nullable',
+            'sort_order' => 'sometimes|string|in:asc,desc|nullable',
+            
+            // Filters
+            'search' => 'sometimes|string|max:255',
+            'query' => 'sometimes|string|max:255|nullable',
+            'category' => 'sometimes|integer|exists:categories,id',
+            'category_id' => 'sometimes|integer|exists:categories,id',
+            'status' => 'sometimes|string|in:active,inactive',
+            'product_type' => 'sometimes|string|in:standard,daily',
+            'has_discount' => 'sometimes|boolean',
+            'stock_status' => 'sometimes|string|in:in_stock,low_stock,out_of_stock',
         ];
     }
 
     /**
-     * Get validated filters for service layer.
-     *
-     * @return array
+     * Get filters normalized to backend format.
      */
     public function getFilters(): array
     {
+        $filters = [];
+
+        // Search
+        if ($this->filled('query')) {
+            $filters['search'] = $this->input('query');
+        } elseif ($this->filled('search')) {
+            $filters['search'] = $this->input('search');
+        }
+
+        // Category (frontend: 'category', backend: 'category_id')
+        if ($this->has('category') && $this->filled('category')) {
+            $filters['category_id'] = (int) $this->input('category');
+        } elseif ($this->has('category_id') && $this->filled('category_id')) {
+            $filters['category_id'] = (int) $this->input('category_id');
+        }
+
+        // Status
+        if ($this->has('status') && $this->filled('status')) {
+            $filters['status'] = $this->input('status');
+        }
+
+        // Product Type
+        if ($this->has('product_type') && $this->filled('product_type')) {
+            $filters['product_type'] = $this->input('product_type');
+        }
+
+        // Has Discount
+        if ($this->has('has_discount')) {
+            $filters['has_discount'] = $this->boolean('has_discount');
+        }
+
+        // Stock Status
+        if ($this->has('stock_status') && $this->filled('stock_status')) {
+            $filters['stock_status'] = $this->input('stock_status');
+        }
+
+        // Sorting (frontend: 'orderby', backend: 'sort_by')
+        if ($this->has('orderby') && $this->filled('orderby')) {
+            $filters['sort_by'] = $this->input('orderby');
+        } elseif ($this->has('sort_by') && $this->filled('sort_by')) {
+            $filters['sort_by'] = $this->input('sort_by');
+        }
+
+        // Sort Order (frontend: 'sort', backend: 'sort_order')
+        if ($this->has('sort') && $this->filled('sort')) {
+            $filters['sort_order'] = $this->input('sort');
+        } elseif ($this->has('sort_order') && $this->filled('sort_order')) {
+            $filters['sort_order'] = $this->input('sort_order');
+        }
+
+        return $filters;
+    }
+
+    /**
+     * Get pagination parameters.
+     */
+    public function getPagination(): array
+    {
+        $page = $this->input('page', 1);
+        
+        // Frontend: 'limit', Backend: 'per_page'
+        $perPage = $this->input('limit') ?? $this->input('per_page', 15);
+
         return [
-            'search' => $this->get('search'),
-            'category_id' => $this->get('category_id'),
-            'product_type' => $this->get('product_type'),
-            'status' => $this->get('status'),
-            'has_discount' => $this->get('has_discount'),
-            'stock_status' => $this->get('stock_status'),
-            'sort_by' => $this->get('sort_by', 'created_at'),
-            'sort_order' => $this->get('sort_order', 'desc'),
+            'page' => (int) $page,
+            'per_page' => (int) $perPage,
         ];
     }
 }
-

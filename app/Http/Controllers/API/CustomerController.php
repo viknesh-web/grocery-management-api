@@ -33,8 +33,9 @@ class CustomerController extends Controller
     {
         try {
             $filters = $request->getFilters();
-            $perPage = $request->get('per_page', 15);
-            
+            $pagination = $request->getPagination();            
+            $perPage = $pagination['per_page'];
+                
             $customers = $this->customerService->getPaginated($filters, $perPage);
             
             return ApiResponse::paginated($customers);
