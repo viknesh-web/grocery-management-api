@@ -6,6 +6,7 @@
         window.UNIT_CONVERSIONS = @json($unitConversions ?? []);
         window.IS_ADMIN = @json($isAdmin ?? false);
         window.CUSTOMERS = @json($customers ?? []);
+        window.PRODUCT_MIN_QTY = @json($productMinQuantities ?? []);
     </script>
   
 </head>
@@ -95,6 +96,11 @@
                     @endforeach
                 </select>
             </div>
+        </div>
+
+        <div id="minQtyErrorSummary">
+            <h4>Minimum Quantity Not Met</h4>
+            <ul id="minQtyErrorList"></ul>
         </div>
         
         <!-- Order Form -->
@@ -193,11 +199,27 @@
         <tbody id="allProducts">
             @foreach($products as $product)
             @php $price = $product->selling_price ?? $product->regular_price; @endphp
-            <tr data-category="{{ $product->category_id }}">
+            @php 
+                $hasMinQty = $product->hasMinimumQuantity();
+                $minQty = $hasMinQty ? $product->min_quantity : null;
+            @endphp
+            <tr data-category="{{ $product->category_id }}" 
+                data-product-id="{{ $product->id }}"
+                data-min-qty="{{ $minQty }}"
+                data-product-name="{{ $product->name }}"
+                data-stock-unit="{{ $product->stock_unit }}">
                 <td class="product-image" data-label="Image">
                     <img src="{{ $product->image_url }}">
                 </td>
-                <td class="order-product-name" data-label="Name">{{ $product->name }}</td>
+                <td class="order-product-name" data-label="Name">
+                    {{ $product->name }}
+                    @if($hasMinQty)
+                    <span class="min-qty-badge" title="Minimum order quantity">
+                        Min: {{ $product->getMinimumQuantityDisplay() }}
+                    </span>
+                    @endif
+                </td>
+                
                 <td class="item-code"  data-label="Item Code">{{ $product->item_code }}</td>
                
                 <td data-label="Price">
@@ -226,11 +248,13 @@
                             min="0" 
                             class="qty"
                             name="products[{{ $product->id }}][qty]"
+                            data-product-id="{{ $product->id }}"
                             value="{{ $selectedQty[$product->id]['qty'] ?? '' }}">
                         
                         <select name="products[{{ $product->id }}][unit]" 
                                 class="unit-select"
                                 data-base-unit="{{ $product->stock_unit }}"
+                                data-product-id="{{ $product->id }}"
                                 style="padding: 6px;">
                             @foreach($product->getAvailableUnits() as $unit)
                                 <option value="{{ $unit }}" 
@@ -239,7 +263,7 @@
                                 </option>
                             @endforeach
                         </select>
-                    </div>
+                    </div>                  
                 </td>
                 <td data-label="Total">
                     <img src="{{ asset('assets/images/Dirham-Symbol-grey.png') }}" width="12">
