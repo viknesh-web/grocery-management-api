@@ -82,6 +82,14 @@ class UpdateProductRequest extends FormRequest
             $dataToMerge['status'] = $this->status;
         }
 
+        if ($this->has('min_quantity') && $this->min_quantity !== null && $this->min_quantity !== '') {
+            $dataToMerge['min_quantity'] = trim((string) $this->min_quantity);
+        }
+
+        if ($this->has('max_quantity') && $this->max_quantity !== null && $this->max_quantity !== '') {
+            $dataToMerge['max_quantity'] = trim((string) $this->max_quantity);
+        }
+
         // Clear discount_value if discount_type is 'none'
         $discountType = $dataToMerge['discount_type'] ?? $this->input('discount_type') ?? null;
         if ($discountType === 'none') {
@@ -110,10 +118,12 @@ class UpdateProductRequest extends FormRequest
             'image' => [
                 'sometimes',
                 'nullable',
-                'image',
-                'mimes:jpeg,png,jpg,webp',
-                'max:2048',
                 function ($attribute, $value, $fail) {
+                    // Skip validation if no file uploaded
+                    if (!$this->hasFile('image')) {
+                        return;
+                    }
+                    
                     // If image is removed, a new image must be provided
                     $imageRemoved = $this->boolean('image_removed', false);
                     if ($imageRemoved && !$value) {
@@ -121,6 +131,8 @@ class UpdateProductRequest extends FormRequest
                     }
                 },
             ],
+            // Add these as separate conditional rules
+        
             'image_removed' => ['sometimes', 'boolean'],
             'regular_price' => ['sometimes', 'required', 'numeric', 'min:0', 'max:999999.99'],
             'discount_type' => ['sometimes', Rule::in(['percentage', 'fixed', 'none'])],
@@ -160,6 +172,8 @@ class UpdateProductRequest extends FormRequest
             'stock_quantity' => ['sometimes', 'required', 'numeric', 'min:0', 'max:999999.99'],
             'stock_unit' => ['sometimes', Rule::in(['kg', 'pieces', 'units', 'liters', 'Kg', 'Pieces', 'Units', 'L'])],
             'status' => ['sometimes', 'string', Rule::in(['active', 'inactive'])],
+            'min_quantity' => ['required', 'numeric', 'min:0'],
+            'max_quantity' => ['numeric', 'min:0'],
             'product_type' => ['sometimes', Rule::in(['daily', 'standard'])],
         ];
     }
