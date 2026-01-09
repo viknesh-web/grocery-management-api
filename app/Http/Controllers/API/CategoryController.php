@@ -16,21 +16,6 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Category Controller
- * 
- * Handles HTTP requests for category operations.
- * 
- * Responsibilities:
- * - HTTP request/response handling
- * - Input validation (via FormRequest classes)
- * - Service method calls
- * - Response formatting (via ApiResponse helper)
- * - Exception handling
- * 
- * Does NOT contain:
- * - Business logic
- * - Direct model queries
- * - Transaction management
- * - Calculations
  */
 class CategoryController extends Controller
 {
@@ -177,29 +162,7 @@ class CategoryController extends Controller
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to update category status', null, 500);
         }
-    }
-
-    /**
-     * Reorder categories.
-     * 
-     * Note: Display order is no longer supported in the schema.
-     * This endpoint is kept for API compatibility but does nothing.
-     *
-     * @param Request $request
-     * @return JsonResponse
-     */
-    public function reorder(Request $request): JsonResponse
-    {
-        try {
-            // Display order is no longer supported
-            // This endpoint is kept for API compatibility but does nothing
-            $this->categoryService->reorder($request->get('categories', []));
-            
-            return ApiResponse::success(null, 'Category reordering is no longer supported');
-        } catch (\Exception $e) {
-            return ApiResponse::error('Failed to process reorder request', null, 500);
-        }
-    }
+    } 
 
     /**
      * Search categories by query string.
@@ -219,29 +182,7 @@ class CategoryController extends Controller
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to search categories', null, 500);
         }
-    }
-
-    /**
-     * Get category tree (hierarchical structure).
-     * 
-     * Note: Hierarchical structure is not yet implemented.
-     * Currently returns flat list of active categories (root categories).
-     *
-     * @param Request $request
-     * @return JsonResponse
-     */
-    public function tree(Request $request): JsonResponse
-    {
-        try {
-            $categories = $this->categoryService->getTree();
-            
-            return ApiResponse::success(
-                $categories->map(fn($category) => $category->toArray())->toArray()
-            );
-        } catch (\Exception $e) {
-            return ApiResponse::error('Failed to retrieve category tree', null, 500);
-        }
-    }
+    }   
 
     /**
      * Get products in a category.

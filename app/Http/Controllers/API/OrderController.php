@@ -61,12 +61,6 @@ class OrderController extends Controller
         }
     }
 
-    /**
-     * Get order details.
-     *
-     * @param int $id
-     * @return JsonResponse
-     */
     public function show(int $id): JsonResponse
     {
         try {
@@ -89,13 +83,6 @@ class OrderController extends Controller
         }
     }
 
-    /**
-     * Update order status.
-     *
-     * @param Request $request
-     * @param Order $order
-     * @return JsonResponse
-     */
     public function updateStatus(Request $request, Order $order): JsonResponse
     {
         try {
@@ -122,14 +109,7 @@ class OrderController extends Controller
         }
     }
 
-
-    /**
-     * Cancel order.
-     *
-     * @param Request $request
-     * @param Order $order
-     * @return JsonResponse
-     */
+  
     public function cancel(Request $request, Order $order): JsonResponse
     {
         try {
@@ -156,12 +136,6 @@ class OrderController extends Controller
         }
     }
 
-    /**
-     * Delete order.
-     *
-     * @param Order $order
-     * @return JsonResponse
-     */
     public function destroy(Order $order): JsonResponse
     {
         try {
@@ -177,11 +151,6 @@ class OrderController extends Controller
         }
     }
 
-    /**
-     * Get order statistics.
-     *
-     * @return JsonResponse
-     */
     public function statistics(): JsonResponse
     {
         try {
@@ -194,10 +163,6 @@ class OrderController extends Controller
         }
     }
 
-     /**
-     * Get customer orders.
-     * 
-     */
     public function customerOrders(Request $request, int $customerId): JsonResponse
     {
         try {
@@ -222,15 +187,12 @@ class OrderController extends Controller
      public function generateOrderUrl(Request $request): JsonResponse
     {
         try {
-            //$user = $request->user();
             $user = Auth::user();
                 Log::info( $user);
-            // Check if user is master/admin
             if (!$user || !$user->master) {
                 return ApiResponse::forbidden('Only admin users can create orders for customers');
             }
             
-            // Generate signed URL that expires in 1 hour
             $signedUrl = URL::temporarySignedRoute(
                 'order.form',
                 now()->addHour(),

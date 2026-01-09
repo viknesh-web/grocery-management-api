@@ -7,15 +7,7 @@ use App\Services\PriceCalculator;
 
 /**
  * Order Item Data Transfer Object
- * 
  * Provides type-safe, immutable data structure for order items.
- * 
- * Benefits:
- * - Type safety (no more mixed array/object handling)
- * - IDE autocomplete support
- * - Clear data contracts
- * - Easy testing
- * - Validation in one place
  */
 class OrderItemDTO
 {
@@ -32,16 +24,7 @@ class OrderItemDTO
         public readonly ?string $productImageUrl = null,
     ) {}
     
-    /**
-     * Create DTO from Product and quantity.
-     *
-     * @param Product $product
-     * @param float $quantity
-     * @param string|null $unit
-     * @param PriceCalculator|null $calculator
-     * @return self
-     */
-    public static function fromProduct(
+     public static function fromProduct(
         Product $product,
         float $quantity,
         ?string $unit = null,
@@ -69,12 +52,6 @@ class OrderItemDTO
         );
     }
     
-    /**
-     * Create DTO from array data.
-     *
-     * @param array $data
-     * @return self
-     */
     public static function fromArray(array $data): self
     {
         return new self(
