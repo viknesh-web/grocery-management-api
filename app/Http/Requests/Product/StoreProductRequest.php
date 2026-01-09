@@ -79,6 +79,14 @@ class StoreProductRequest extends FormRequest
             $dataToMerge['product_type'] = 'daily';
         }
 
+        if ($this->has('min_quantity') && $this->min_quantity !== null && $this->min_quantity !== '') {
+            $dataToMerge['min_quantity'] = trim((string) $this->min_quantity);
+        }
+
+        if ($this->has('max_quantity') && $this->max_quantity !== null && $this->max_quantity !== '') {
+            $dataToMerge['max_quantity'] = trim((string) $this->max_quantity);
+        }
+
         // Normalize status with default
         if ($this->has('status') && in_array($this->status, ['active', 'inactive'])) {
             $dataToMerge['status'] = $this->status;
@@ -144,6 +152,8 @@ class StoreProductRequest extends FormRequest
             'stock_quantity' => ['required', 'numeric', 'min:0', 'max:999999.99'],
             'stock_unit' => ['required', Rule::in(['Kg', 'Pieces', 'Units', 'L'])],
             'status' => ['sometimes', 'string', Rule::in(['active', 'inactive'])],
+            'min_quantity' => ['required', 'numeric', 'min:0'],
+            'max_quantity' => ['numeric', 'min:0'],
             'product_type' => ['sometimes', Rule::in(['daily', 'standard'])],
         ];
     }
