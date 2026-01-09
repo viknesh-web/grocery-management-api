@@ -10,19 +10,6 @@ use Illuminate\Http\JsonResponse;
 
 /**
  * Dashboard Controller
- * 
- * Handles HTTP requests for dashboard operations.
- * 
- * Responsibilities:
- * - HTTP request/response handling
- * - Service method calls
- * - Response formatting (via ApiResponse helper)
- * - Exception handling
- * 
- * Does NOT contain:
- * - Business logic
- * - Direct model queries
- * - Data aggregation
  */
 class DashboardController extends Controller
 {

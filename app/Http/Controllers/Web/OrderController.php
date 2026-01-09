@@ -21,12 +21,6 @@ use Illuminate\Support\Facades\URL;
 
 /**
  * Order Controller - Using Signed URLs (No Token Storage Required)
- * 
- * APPROACH 1: SIGNED URLS (RECOMMENDED)
- * - No database token storage needed
- * - Secure with signature validation
- * - Time-limited access
- * - Perfect for cross-domain
  */
 class OrderController extends Controller
 {
@@ -38,12 +32,7 @@ class OrderController extends Controller
         private PriceCalculator $priceCalculator,
         private CustomerRepository $customerRepository
     ) {}
-
-    /**
-     * Show order form.
-     * 
-     * UPDATED: Uses signed URL validation instead of token
-     */
+  
     public function index(Request $request)
     {
         try {
@@ -57,7 +46,6 @@ class OrderController extends Controller
             
             $unitConversions = Product::UNIT_CONVERSIONS;
             
-            // Check if this is an admin order creation
             $isAdmin = $request->boolean('is_admin', false);
             $adminUserId = $request->get('admin_user_id');
             $signature = $request->get('signature');
@@ -230,12 +218,7 @@ class OrderController extends Controller
                 ->with('error', 'Unable to generate PDF. Please try again.');
         }
     }
-
-    /**
-     * Confirm order (AJAX endpoint).
-     * 
-     * UPDATED: Calculate grand total on backend
-     */
+ 
     public function confirm(ConfirmOrderRequest $request): JsonResponse
     {
         try {

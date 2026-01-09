@@ -16,25 +16,6 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Customer Controller
- * 
- * Handles HTTP requests for customer operations.
- * 
- * Responsibilities:
- * - HTTP request/response handling
- * - Input validation (via FormRequest classes)
- * - Service method calls
- * - Response formatting (via ApiResponse helper)
- * - Exception handling
- * 
- * Note: Phone number normalization is handled in FormRequest classes
- * (StoreCustomerRequest and UpdateCustomerRequest) via PhoneNumberHelper.
- * 
- * Does NOT contain:
- * - Business logic
- * - Direct model queries
- * - Transaction management
- * - Calculations
- * - Phone number normalization (handled in FormRequest)
  */
 class CustomerController extends Controller
 {

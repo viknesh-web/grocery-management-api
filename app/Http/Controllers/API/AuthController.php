@@ -14,21 +14,6 @@ use Illuminate\Http\Request;
 
 /**
  * Authentication Controller
- * 
- * Handles HTTP requests for authentication operations.
- * 
- * Responsibilities:
- * - HTTP request/response handling
- * - Input validation (via FormRequest classes)
- * - Service method calls
- * - Response formatting (via ApiResponse helper)
- * - Exception handling
- * 
- * Does NOT contain:
- * - Business logic
- * - Direct User model queries
- * - Password hashing
- * - Token generation
  */
 class AuthController extends Controller
 {

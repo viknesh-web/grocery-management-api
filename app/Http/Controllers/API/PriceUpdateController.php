@@ -19,20 +19,6 @@ use Illuminate\Http\JsonResponse;
 
 /**
  * Price Update Controller
- * 
- * Handles HTTP requests for price update operations.
- * 
- * Responsibilities:
- * - HTTP request/response handling
- * - Input validation (via FormRequest classes)
- * - Service method calls
- * - Response formatting (via ApiResponse helper)
- * - Exception handling
- * 
- * Does NOT contain:
- * - Business logic
- * - Direct model queries
- * - Transaction management
  */
 class PriceUpdateController extends Controller
 {
@@ -40,12 +26,6 @@ class PriceUpdateController extends Controller
         private PriceUpdateService $priceUpdateService
     ) {}
 
-    /**
-     * Get all products for price updates.
-     *
-     * @param GetProductsRequest $request
-     * @return JsonResponse
-     */
     public function getProducts(GetProductsRequest $request): JsonResponse
     {
         try {
@@ -62,12 +42,6 @@ class PriceUpdateController extends Controller
         }
     }
 
-    /**
-     * Bulk update product prices.
-     *
-     * @param BulkPriceUpdateRequest $request
-     * @return JsonResponse
-     */
     public function bulkUpdate(BulkPriceUpdateRequest $request): JsonResponse
     {
         try {
@@ -97,14 +71,7 @@ class PriceUpdateController extends Controller
             );
         }
     }
-
-    /**
-     * Get price update history for a product.
-     *
-     * @param PriceHistoryRequest $request
-     * @param Product $product
-     * @return JsonResponse
-     */
+ 
     public function productHistory(PriceHistoryRequest $request, Product $product): JsonResponse
     {
         try {
@@ -125,13 +92,7 @@ class PriceUpdateController extends Controller
             );
         }
     }
-
-    /**
-     * Get price updates by date range.
-     *
-     * @param DateRangeRequest $request
-     * @return JsonResponse
-     */
+ 
     public function byDateRange(DateRangeRequest $request): JsonResponse
     {
         try {
@@ -152,12 +113,6 @@ class PriceUpdateController extends Controller
         }
     }
 
-    /**
-     * Get recent price updates.
-     *
-     * @param RecentRequest $request
-     * @return JsonResponse
-     */
     public function recent(RecentRequest $request): JsonResponse
     {
         try {

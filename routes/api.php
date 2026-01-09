@@ -44,7 +44,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::get('/tree', [CategoryController::class, 'tree']);
         Route::group(['prefix' => '/{category}'], function () {
             Route::get('/', [CategoryController::class, 'show']);
-            Route::put('/', [CategoryController::class, 'update']);
+            Route::post('/', [CategoryController::class, 'update']);
             Route::delete('/', [CategoryController::class, 'destroy']);
             Route::post('/toggle-status', [CategoryController::class, 'toggleStatus']);
             Route::get('/products', [CategoryController::class, 'products']);
@@ -67,7 +67,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::post('/', [CustomerController::class, 'store']);
         Route::group(['prefix' => '/{customer}'], function () {
             Route::get('/', [CustomerController::class, 'show']);
-            Route::put('/', [CustomerController::class, 'update']);
+            Route::put('/edit', [CustomerController::class, 'update']);
             Route::delete('/', [CustomerController::class, 'destroy']);
             Route::post('/toggle-status', [CustomerController::class, 'toggleStatus']);
         });

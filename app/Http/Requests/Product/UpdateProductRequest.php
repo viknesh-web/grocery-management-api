@@ -105,7 +105,7 @@ class UpdateProductRequest extends FormRequest
 
         return [
             'name' => ['sometimes', 'required', 'string', 'min:2', 'max:255'],
-            'item_code' => ['sometimes', 'required', 'string', 'max:100', Rule::unique('products', 'item_code')->ignore($productId)],
+            'item_code' => ['sometimes', 'required', 'string', 'max:100',],
             'category_id' => ['sometimes', 'nullable', 'integer', 'exists:categories,id'],
             'image' => [
                 'sometimes',

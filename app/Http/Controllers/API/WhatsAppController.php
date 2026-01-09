@@ -19,21 +19,6 @@ use Illuminate\Http\JsonResponse;
 
 /**
  * WhatsApp Controller
- * 
- * Handles HTTP requests for WhatsApp operations.
- * 
- * Responsibilities:
- * - HTTP request/response handling
- * - Input validation (via FormRequest classes)
- * - Service method calls
- * - Response formatting (via ApiResponse helper)
- * - Exception handling
- * 
- * Does NOT contain:
- * - Business logic
- * - Direct model queries
- * - PDF upload logic (delegated to PdfService)
- * - Validation logic (delegated to FormRequest)
  */
 class WhatsAppController extends Controller
 {
@@ -42,12 +27,6 @@ class WhatsAppController extends Controller
         private PdfService $pdfService
     ) {}
 
-    /**
-     * Generate price list PDF.
-     *
-     * @param GeneratePriceListRequest $request
-     * @return JsonResponse
-     */
     public function generatePriceList(GeneratePriceListRequest $request): JsonResponse
     {
         try {
@@ -71,13 +50,7 @@ class WhatsAppController extends Controller
             );
         }
     }
-
-    /**
-     * Send WhatsApp message to customers.
-     *
-     * @param SendMessageRequest $request
-     * @return JsonResponse
-     */
+  
     public function sendMessage(SendMessageRequest $request): JsonResponse
     {
         try {
@@ -141,13 +114,7 @@ class WhatsAppController extends Controller
             );
         }
     }
-
-    /**
-     * Send WhatsApp update with product selection (no customer selection).
-     *
-     * @param SendProductUpdateRequest $request
-     * @return JsonResponse
-     */
+  
     public function sendProductUpdate(SendProductUpdateRequest $request): JsonResponse
     {
         try {
@@ -158,16 +125,15 @@ class WhatsAppController extends Controller
             $contentVariables = $request->getContentVariables();
             $async = $request->boolean('async', true);
 
-            // Send to all active customers
             $results = $this->whatsAppService->sendPriceListToCustomers(
-                null, // null means all active customers
+                null, 
                 $message,
                 $includePdf,
                 $productIds,
                 $templateId,
                 $contentVariables,
-                null, // customPdfUrl
-                'regular', // pdfLayout
+                null, 
+                'regular', 
                 $async
             );
 
@@ -203,13 +169,6 @@ class WhatsAppController extends Controller
         }
     }
 
-    /**
-     * Send test message to a single customer.
-     *
-     * @param SendTestMessageRequest $request
-     * @param Customer $customer
-     * @return JsonResponse
-     */
     public function sendTestMessage(SendTestMessageRequest $request, Customer $customer): JsonResponse
     {
         try {
@@ -233,12 +192,6 @@ class WhatsAppController extends Controller
         }
     }
 
-    /**
-     * Validate WhatsApp number format.
-     *
-     * @param ValidateNumberRequest $request
-     * @return JsonResponse
-     */
     public function validateNumber(ValidateNumberRequest $request): JsonResponse
     {
         try {

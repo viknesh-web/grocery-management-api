@@ -17,20 +17,6 @@ use Illuminate\Validation\ValidationException;
 /**
  * Product Controller
  * 
- * Handles HTTP requests for product operations.
- * 
- * Responsibilities:
- * - HTTP request/response handling
- * - Input validation (via FormRequest classes)
- * - Service method calls
- * - Response formatting (via ApiResponse helper)
- * - Exception handling
- * 
- * Does NOT contain:
- * - Business logic
- * - Direct model queries
- * - Transaction management
- * - Calculations
  */
 class ProductController extends Controller
 {
@@ -38,12 +24,6 @@ class ProductController extends Controller
         private ProductService $productService
     ) {}
 
-    /**
-     * Get paginated list of products.
-     *
-     * @param IndexProductRequest $request
-     * @return JsonResponse
-     */
     public function index(IndexProductRequest $request): JsonResponse
     {
         try {
@@ -58,12 +38,6 @@ class ProductController extends Controller
         }
     }
 
-    /**
-     * Store a newly created product.
-     *
-     * @param StoreProductRequest $request
-     * @return JsonResponse
-     */
     public function store(StoreProductRequest $request): JsonResponse
     {
         try {
@@ -84,12 +58,6 @@ class ProductController extends Controller
         }
     }
 
-    /**
-     * Display the specified product.
-     *
-     * @param Request $request
-     * @return JsonResponse
-     */
     public function show(Request $request): JsonResponse
     {
         try {
@@ -103,12 +71,6 @@ class ProductController extends Controller
         }
     }
 
-    /**
-     * Update the specified product.
-     *
-     * @param UpdateProductRequest $request
-     * @return JsonResponse
-     */
     public function update(UpdateProductRequest $request): JsonResponse
     {
         try {
@@ -132,12 +94,6 @@ class ProductController extends Controller
         }
     }
 
-    /**
-     * Remove the specified product.
-     *
-     * @param Request $request
-     * @return JsonResponse
-     */
     public function destroy(Request $request): JsonResponse
     {
         try {
@@ -153,12 +109,6 @@ class ProductController extends Controller
         }
     }
 
-    /**
-     * Toggle the status of the specified product.
-     *
-     * @param Request $request
-     * @return JsonResponse
-     */
     public function toggleStatus(Request $request): JsonResponse
     {
         try {
