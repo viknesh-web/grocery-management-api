@@ -14,6 +14,7 @@ use App\Services\CartService;
 use App\Services\OrderPdfService;
 use App\Services\OrderService;
 use App\Services\PriceCalculator;
+use App\Validator\OrderValidator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -45,6 +46,17 @@ class OrderController extends Controller
             }
             
             $unitConversions = Product::UNIT_CONVERSIONS;
+
+            $productMinQuantities = [];
+            foreach ($formData['products'] as $product) {
+                if ($product->hasMinimumQuantity()) {
+                    $productMinQuantities[$product->id] = [
+                        'min_qty' => $product->min_quantity,
+                        'unit' => $product->stock_unit,
+                        'display' => $product->getMinimumQuantityDisplay(),
+                    ];
+                }
+            }
             
             $isAdmin = $request->boolean('is_admin', false);
             $adminUserId = $request->get('admin_user_id');
@@ -95,6 +107,7 @@ class OrderController extends Controller
             return view('order.form', array_merge($formData, [
                 'selectedQty' => $selectedQty,
                 'unitConversions' => $unitConversions,
+                'productMinQuantities' => $productMinQuantities,
                 'isAdmin' => $isAdmin,
                 'adminUserId' => $adminUserId,
                 'adminUser' => $adminUser,
@@ -128,6 +141,21 @@ class OrderController extends Controller
                     'admin_user_id' => $request->get('admin_user_id'),
                     'selected_customer_id' => $request->get('selected_customer_id'),
                 ]);
+            }
+
+            $products = $request->products ?? [];
+            
+            // Validate minimum quantities
+            $minQtyValidation = OrderValidator::validateProductQuantities($products);
+            
+            if (!$minQtyValidation['valid']) {
+                $errorMessage = 'Minimum quantity requirements not met for some products: ' . 
+                    implode(', ', $minQtyValidation['errors']);
+                
+                return redirect()->back()
+                    ->with('error', $errorMessage)
+                    ->with('min_qty_errors', $minQtyValidation['errors'])
+                    ->withInput();
             }
             
             $this->orderService->processReview($request->products ?? []);
@@ -232,6 +260,18 @@ class OrderController extends Controller
                     'message' => 'Cart is empty. Please add products to your order.',
                 ], 400);
             }
+
+            $rawCartItems = $this->cartService->getRawCartItems();
+            $minQtyValidation = OrderValidator::validateProductQuantities($rawCartItems);
+            
+            if (!$minQtyValidation['valid']) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Minimum quantity requirements not met',
+                    'errors' => $minQtyValidation['errors'],
+                ], 422);
+            }
+            
             
             // Calculate grand total on backend using PriceCalculator
             $items = $products->map(fn($p) => [

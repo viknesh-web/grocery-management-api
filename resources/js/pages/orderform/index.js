@@ -1,6 +1,7 @@
 document.addEventListener("DOMContentLoaded", function () {
     // Get unit conversions from blade template (passed from controller)
     const UNIT_CONVERSIONS = window.UNIT_CONVERSIONS || {};
+    const PRODUCT_MIN_QTY = window.PRODUCT_MIN_QTY || {};
     
     const leftTable = document.getElementById('leftTable');
     const rightTable = document.getElementById('rightTable');
@@ -10,6 +11,8 @@ document.addEventListener("DOMContentLoaded", function () {
     const reviewBtn = document.getElementById('reviewBtn');
     const tablesWrapper = document.querySelector('.tables-wrapper');
     const noProductsMsg = document.getElementById('noProductsMsg');
+    const minQtyErrorSummary = document.getElementById('minQtyErrorSummary');
+    const minQtyErrorList = document.getElementById('minQtyErrorList');
  
     /**
      * Distribute products between left and right tables
@@ -25,7 +28,6 @@ document.addEventListener("DOMContentLoaded", function () {
         const leftBox = leftTable.closest('.table-box');
         const rightBox = rightTable.closest('.table-box');
  
-        // RESET layout every time
         leftBox.classList.remove('full-width');
         leftBox.style.display = '';
         rightBox.style.display = '';
@@ -34,7 +36,6 @@ document.addEventListener("DOMContentLoaded", function () {
             noProductsMsg.style.display = 'block';
             tablesWrapper.style.display = 'none';
             
-            // Hide footer actions
             document.querySelector('.grand-total').style.display = 'none';
             reviewBtn.style.display = 'none';
             
@@ -50,6 +51,7 @@ document.addEventListener("DOMContentLoaded", function () {
             leftBox.classList.add('full-width');
             rightBox.style.display = 'none';
             leftTable.appendChild(visibleRows[0].cloneNode(true));
+            attachEventListeners();
             return;
         }
  
@@ -60,6 +62,7 @@ document.addEventListener("DOMContentLoaded", function () {
             visibleRows.forEach(row => {
                 leftTable.appendChild(row.cloneNode(true));
             });
+            attachEventListeners();
             return;
         }
  
@@ -69,25 +72,44 @@ document.addEventListener("DOMContentLoaded", function () {
             const clone = row.cloneNode(true);
             (index < half ? leftTable : rightTable).appendChild(clone);
         });
+        
+        attachEventListeners();
+    }
+ 
+    /**
+     * Attach event listeners to cloned rows
+     */
+    function attachEventListeners() {
+        document.querySelectorAll('.qty').forEach(input => {
+            input.addEventListener('input', function() {
+                validateMinimumQuantity(this);
+                calculateTotals();
+            });
+        });
+        
+        document.querySelectorAll('.unit-select').forEach(select => {
+            select.addEventListener('change', function() {
+                const productId = this.getAttribute('data-product-id');
+                const qtyInput = document.querySelector(`.qty[data-product-id="${productId}"]`);
+                if (qtyInput) {
+                    validateMinimumQuantity(qtyInput);
+                }
+                calculateTotals();
+            });
+        });
     }
  
     /**
      * Calculate unit conversion factor
-     * 
-     * @param {string} baseUnit - Product's stock unit (e.g., 'kg')
-     * @param {string} targetUnit - Customer's selected unit (e.g., 'g')
-     * @returns {number|null} - Conversion factor or null if not possible
      */
     function getUnitConversionFactor(baseUnit, targetUnit) {
         baseUnit = baseUnit.toLowerCase().trim();
         targetUnit = targetUnit.toLowerCase().trim();
         
-        // Same unit, no conversion needed
         if (baseUnit === targetUnit) {
             return 1;
         }
         
-        // Find conversion factor
         for (const [family, data] of Object.entries(UNIT_CONVERSIONS)) {
             if (data.conversions && 
                 data.conversions[baseUnit] && 
@@ -100,33 +122,201 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         }
         
-        // No conversion found
         console.warn(`Cannot convert from ${targetUnit} to ${baseUnit}`);
         return null;
     }
     
     /**
      * Calculate price with unit conversion
-     * 
-     * @param {number} qty - Quantity
-     * @param {string} unit - Selected unit
-     * @param {string} baseUnit - Product's base unit
-     * @param {number} basePrice - Price per base unit
-     * @returns {number} - Total price
      */
     function calculateWithConversion(qty, unit, baseUnit, basePrice) {
         const conversionFactor = getUnitConversionFactor(baseUnit, unit);
         
         if (conversionFactor === null) {
-            // Fallback to base calculation if conversion fails
             return basePrice * qty;
         }
         
-        // Convert quantity to base unit
-        // Example: 500g to kg → 500 / 1000 = 0.5 kg
         const qtyInBaseUnit = qty / conversionFactor;
         
         return basePrice * qtyInBaseUnit;
+    }
+    
+    /**
+     * Validate minimum quantity for a product
+     */
+    function validateMinimumQuantity(qtyInput) {
+        const productId = qtyInput.getAttribute('data-product-id');
+        const row = qtyInput.closest('tr');
+        const minQty = parseFloat(row.getAttribute('data-min-qty'));
+        const stockUnit = row.getAttribute('data-stock-unit');
+        const qty = parseFloat(qtyInput.value || 0);
+        
+        // Clear previous error state
+        qtyInput.classList.remove('qty-input-error');
+        const warning = document.getElementById(`minQtyWarning${productId}`);
+        if (warning) {
+            warning.classList.remove('show');
+        }
+        
+        // If no minimum or quantity is 0, no validation needed
+        if (!minQty || minQty <= 0 || qty <= 0) {
+            return true;
+        }
+        
+        // Get selected unit
+        const unitSelect = row.querySelector('.unit-select');
+        const selectedUnit = unitSelect ? unitSelect.value : stockUnit;
+        
+        // Check if minimum quantity is met
+        let isValid = false;
+        
+        if (selectedUnit.toLowerCase() === stockUnit.toLowerCase()) {
+            // Same unit, direct comparison
+            isValid = qty >= minQty;
+        } else {
+            // Different unit, convert to base unit
+            const conversionFactor = getUnitConversionFactor(stockUnit, selectedUnit);
+            if (conversionFactor !== null) {
+                const qtyInBaseUnit = qty / conversionFactor;
+                isValid = qtyInBaseUnit >= minQty;
+            } else {
+                // Cannot convert, assume valid
+                isValid = true;
+            }
+        }
+        
+        // Show error if not valid
+        if (!isValid) {
+            qtyInput.classList.add('qty-input-error');
+            if (warning) {
+                warning.classList.add('show');
+            }
+            return false;
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Validate all minimum quantities and show summary
+     */
+    /**
+     * Validate minimum quantity for a product
+     */
+    function validateMinimumQuantity(qtyInput) {
+        const productId = qtyInput.getAttribute('data-product-id');
+        const row = qtyInput.closest('tr');
+        const minQty = parseFloat(row.getAttribute('data-min-qty'));
+        const stockUnit = row.getAttribute('data-stock-unit');
+        const qty = parseFloat(qtyInput.value || 0);
+        
+        // Clear previous error state
+        qtyInput.classList.remove('qty-input-error');
+        const warning = document.getElementById(`minQtyWarning${productId}`);
+        if (warning) {
+            warning.classList.remove('show');
+        }
+        
+        // If no minimum or quantity is 0, no validation needed
+        if (!minQty || minQty <= 0 || qty <= 0) {
+            return true;
+        }
+        
+        // Get selected unit
+        const unitSelect = row.querySelector('.unit-select');
+        const selectedUnit = unitSelect ? unitSelect.value : stockUnit;
+        
+        // Check if minimum quantity is met
+        let isValid = false;
+        
+        if (selectedUnit.toLowerCase() === stockUnit.toLowerCase()) {
+            // Same unit, direct comparison
+            isValid = qty >= minQty;
+        } else {
+            // Different unit, convert to base unit
+            const conversionFactor = getUnitConversionFactor(stockUnit, selectedUnit);
+            if (conversionFactor !== null) {
+                const qtyInBaseUnit = qty / conversionFactor;
+                isValid = qtyInBaseUnit >= minQty;
+            } else {
+                // Cannot convert, assume valid
+                isValid = true;
+            }
+        }
+        
+        // Show error if not valid
+        if (!isValid) {
+            qtyInput.classList.add('qty-input-error');
+            if (warning) {
+                warning.classList.add('show');
+            }
+            return false;
+        }
+        
+        return true;
+    }
+
+    /**
+     * Validate all minimum quantities and show summary
+     */
+    function validateAllMinimumQuantities() {
+        const errors = [];
+        
+        document.querySelectorAll('.productTable tr').forEach(row => {
+            const qtyInput = row.querySelector('.qty');
+            if (!qtyInput) return;
+            
+            const qty = parseFloat(qtyInput.value || 0);
+            if (qty <= 0) return; // Skip products with no quantity
+            
+            const productId = qtyInput.getAttribute('data-product-id');
+            const minQty = parseFloat(row.getAttribute('data-min-qty'));
+            const stockUnit = row.getAttribute('data-stock-unit');
+            const productName = row.getAttribute('data-product-name') || 'Product';
+            
+            if (!minQty || minQty <= 0) return;
+            
+            const unitSelect = row.querySelector('.unit-select');
+            const selectedUnit = unitSelect ? unitSelect.value : stockUnit;
+            
+            // Check if minimum is met
+            let isValid = false;
+            
+            if (selectedUnit.toLowerCase() === stockUnit.toLowerCase()) {
+                isValid = qty >= minQty;
+            } else {
+                const conversionFactor = getUnitConversionFactor(stockUnit, selectedUnit);
+                if (conversionFactor !== null) {
+                    const qtyInBaseUnit = qty / conversionFactor;
+                    isValid = qtyInBaseUnit >= minQty;
+                } else {
+                    isValid = true;
+                }
+            }
+            
+            if (!isValid) {
+                const minQtyDisplay = minQty + ' ' + stockUnit;
+                errors.push({
+                    productId: productId,
+                    productName: productName,
+                    message: `${productName}: Minimum order is ${minQtyDisplay}`
+                });
+            }
+        });
+        
+        // Show or hide error summary
+        if (errors.length > 0 && minQtyErrorSummary) {
+            minQtyErrorList.innerHTML = errors.map(err => 
+                `<li>${err.message}</li>`
+            ).join('');
+            minQtyErrorSummary.classList.add('show');
+            return false;
+        } else if (minQtyErrorSummary) {
+            minQtyErrorSummary.classList.remove('show');
+            return true;
+        }
+        
+        return true;
     }
  
     /**
@@ -149,7 +339,6 @@ document.addEventListener("DOMContentLoaded", function () {
             let total = 0;
             
             if (unitSelect) {
-                // Unit conversion enabled
                 const unit = unitSelect.value;
                 const baseUnit = unitSelect.getAttribute('data-base-unit');
                 
@@ -159,7 +348,6 @@ document.addEventListener("DOMContentLoaded", function () {
                     total = calculateWithConversion(qty, unit, baseUnit, basePrice);
                 }
             } else {
-                // No unit conversion (backward compatibility)
                 total = basePrice * qty;
             }
  
@@ -178,7 +366,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
  
     /**
-     * Handle review button click
+     * Handle review button click with minimum quantity validation
      */
     document.getElementById('reviewBtn').addEventListener('click', function (e) {
         const hasQty = calculateTotals();
@@ -188,9 +376,19 @@ document.addEventListener("DOMContentLoaded", function () {
             e.preventDefault();
             errorBox.style.display = 'block';
             errorBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        } else {
-            errorBox.style.display = 'none';
+            return;
         }
+        
+        // Validate minimum quantities
+        const minQtyValid = validateAllMinimumQuantities();
+        
+        if (!minQtyValid) {
+            e.preventDefault();
+            minQtyErrorSummary.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return;
+        }
+        
+        errorBox.style.display = 'none';
     });
  
     /**
@@ -198,6 +396,7 @@ document.addEventListener("DOMContentLoaded", function () {
      */
     document.addEventListener('input', e => {
         if (e.target.classList.contains('qty')) {
+            validateMinimumQuantity(e.target);
             calculateTotals();
         }
     });
@@ -207,6 +406,11 @@ document.addEventListener("DOMContentLoaded", function () {
      */
     document.addEventListener('change', e => {
         if (e.target.classList.contains('unit-select')) {
+            const productId = e.target.getAttribute('data-product-id');
+            const qtyInput = document.querySelector(`.qty[data-product-id="${productId}"]`);
+            if (qtyInput) {
+                validateMinimumQuantity(qtyInput);
+            }
             calculateTotals();
         }
     });
@@ -224,6 +428,7 @@ document.addEventListener("DOMContentLoaded", function () {
  
             distributeProducts();
             calculateTotals();
+            validateAllMinimumQuantities();
         });
     }
  
@@ -242,9 +447,9 @@ document.addEventListener("DOMContentLoaded", function () {
     calculateTotals();
  
     /**
-     * Refresh handler - preserve admin order parameters
+     * Refresh handler - redirect to base URL
      */
-    if (performance.getEntriesByType("navigation")[0].type === "reload") {
+   if (performance.getEntriesByType("navigation")[0].type === "reload") {
         // Check if this is an admin order (has required query params)
         const urlParams = new URLSearchParams(window.location.search);
         const isAdmin = urlParams.get('is_admin');

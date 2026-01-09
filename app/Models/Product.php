@@ -632,4 +632,61 @@ class Product extends Model
         return $this->stock_quantity > 10 ? 'in_stock' : 
                ($this->stock_quantity > 0 ? 'low_stock' : 'out_of_stock');
     }
+
+    public function hasMinimumQuantity(): bool
+    {
+        return $this->min_quantity !== null && $this->min_quantity > 0;
+    }
+
+    /**
+     * Get minimum quantity for display (with unit).
+     */
+    public function getMinimumQuantityDisplay(): ?string
+    {
+        if (!$this->hasMinimumQuantity()) {
+            return null;
+        }
+
+        return $this->formatQuantityWithUnit($this->min_quantity, $this->stock_unit);
+    }
+
+    public function meetsMinimumQuantity(float $quantity, string $unit): bool
+    {
+        if (!$this->hasMinimumQuantity()) {
+            return true; // No minimum set, always valid
+        }
+
+        if (strtolower($unit) === strtolower($this->stock_unit)) {
+            return $quantity >= $this->min_quantity;
+        }
+
+        try {
+            $conversionFactor = $this->getUnitConversionFactor(
+                $this->normalizeUnit($this->stock_unit),
+                $this->normalizeUnit($unit)
+            );
+
+            if ($conversionFactor === null) {
+                return true;
+            }
+            $quantityInBaseUnit = $quantity / $conversionFactor;
+
+            return $quantityInBaseUnit >= $this->min_quantity;
+        } catch (\Exception $e) {
+            return true;
+        }
+    }
+
+    public function getMinimumQuantityError(float $quantity, string $unit): ?string
+    {
+        if (!$this->hasMinimumQuantity()) {
+            return null;
+        }
+
+        if ($this->meetsMinimumQuantity($quantity, $unit)) {
+            return null;
+        }
+
+        return "Minimum order quantity for {$this->name} is {$this->getMinimumQuantityDisplay()}";
+    }
 }
