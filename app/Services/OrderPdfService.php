@@ -6,6 +6,7 @@ use App\Exceptions\BusinessException;
 use App\Repositories\ProductRepository;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Collection as SupportCollection;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -46,7 +47,7 @@ class OrderPdfService
         return $pdf->download($filename);
     }
     
-    protected function normalizeProductsInput($productsInput): Collection
+    protected function normalizeProductsInput($productsInput): Collection|SupportCollection
     {
         if (empty($productsInput)) {
             return $this->getProductsFromSession();
@@ -55,10 +56,11 @@ class OrderPdfService
             return $this->getProductsFromFormInput($productsInput);
         }
 
+        // Convert to Support Collection if it's an array
         return collect($productsInput);
     }
    
-    protected function getProductsFromSession(): Collection
+    protected function getProductsFromSession(): SupportCollection
     {
         $products = session(self::SESSION_KEY_REVIEW_PRODUCTS, collect());
         
@@ -96,7 +98,7 @@ class OrderPdfService
         return true;
     }
 
-    protected function generatePdf(Collection $products)
+    protected function generatePdf(Collection|SupportCollection $products)
     {
         $pdf = Pdf::loadView('order.pdf', ['products' => $products]);
         $pdf->setPaper(self::PDF_PAPER_SIZE, self::PDF_ORIENTATION);
@@ -109,3 +111,4 @@ class OrderPdfService
         return 'order-' . now()->format('Y-m-d-H-i-s') . '.pdf';
     }
 }
+ 

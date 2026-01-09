@@ -34,8 +34,6 @@ class ProductService extends BaseService
     {
         return $this->handle(function () use ($id) {
             $relations = [
-                'creator:id,name,email',
-                'updater:id,name,email',
                 'category:id,name'
             ];
             
@@ -47,8 +45,6 @@ class ProductService extends BaseService
     {
         return $this->handle(function () use ($id) {
             $relations = [
-                'creator:id,name,email',
-                'updater:id,name,email',
                 'category:id,name'
             ];
             

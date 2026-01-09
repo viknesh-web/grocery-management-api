@@ -256,7 +256,7 @@ class OrderRepository extends BaseRepository
 
     public function getTotalAmountByDate(string $date): float
     {
-        return (float) $this->query()->whereDate('created_at', $date)->sum('total_amount');
+        return (float) $this->query()->whereDate('created_at', $date)->sum('total');
     }
 
     public function getTotalByDate(string $date): float
