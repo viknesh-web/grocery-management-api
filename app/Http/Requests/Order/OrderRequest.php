@@ -27,7 +27,7 @@ class OrderRequest extends FormRequest
     {
         return [
             'search' => ['sometimes','max:255'],
-            'status' => ['sometimes', 'string', Rule::in(['pending', 'confirmed', 'processing', 'completed', 'cancelled'])],
+            'status' => ['sometimes', 'string', Rule::in(['pending', 'confirmed', 'processing', 'delivered', 'cancelled'])],
             'customer_ids' => ['sometimes', 'array'],
             'customer_ids.*' => ['integer', 'exists:customers,id'],
             'customer_address' => ['sometimes', 'string', 'max:255'],
