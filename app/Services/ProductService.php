@@ -7,12 +7,13 @@ use App\Models\Product;
 use App\Repositories\CategoryRepository;
 use App\Repositories\PriceUpdateRepository;
 use App\Repositories\ProductRepository;
+use App\Repositories\ProductDiscountRepository;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\UploadedFile;
 
 /**
- * Product Service - Updated with Category Status Check
+ * Product Service - Updated with ProductDiscount Integration
  */
 class ProductService extends BaseService
 {
@@ -20,12 +21,26 @@ class ProductService extends BaseService
         private ProductRepository $repository,
         private PriceUpdateRepository $priceUpdateRepository,
         private CategoryRepository $categoryRepository,
+        private ProductDiscountRepository $discountRepository,
         private ImageService $imageService
     ) {}
 
     public function getPaginated(array $filters = [], int $perPage = 15): \Illuminate\Contracts\Pagination\LengthAwarePaginator
     {
-        $relations = ['category:id,name,status'];
+        $relations = ['category:id,name,status', 'discounts' => function ($query) {
+            $query->where('status', 'active')
+                ->where(function ($q) {
+                    $now = now();
+                    $q->whereNull('start_date')
+                        ->orWhere('start_date', '<=', $now);
+                })
+                ->where(function ($q) {
+                    $now = now();
+                    $q->whereNull('end_date')
+                        ->orWhere('end_date', '>=', $now);
+                });
+        }];
+        
         $products = $this->repository->paginate($filters, $perPage, $relations);
         $totalFiltered = $this->repository->countByFilters($filters);
         $filtersApplied = array_filter($filters, fn($value) => !empty($value));
@@ -39,7 +54,20 @@ class ProductService extends BaseService
     {
         return $this->handle(function () use ($id) {
             $relations = [
-                'category:id,name,status'
+                'category:id,name,status',
+                'discounts' => function ($query) {
+                    $query->where('status', 'active')
+                        ->where(function ($q) {
+                            $now = now();
+                            $q->whereNull('start_date')
+                                ->orWhere('start_date', '<=', $now);
+                        })
+                        ->where(function ($q) {
+                            $now = now();
+                            $q->whereNull('end_date')
+                                ->orWhere('end_date', '>=', $now);
+                        });
+                }
             ];
             
             return $this->repository->find($id, $relations);
@@ -50,7 +78,8 @@ class ProductService extends BaseService
     {
         return $this->handle(function () use ($id) {
             $relations = [
-                'category:id,name,status'
+                'category:id,name,status',
+                'discounts'
             ];
             
             return $this->repository->findOrFail($id, $relations);
@@ -60,7 +89,7 @@ class ProductService extends BaseService
     public function create(array $data, ?UploadedFile $image, int $userId): Product
     {
         return $this->transaction(function () use ($data, $image, $userId) {
-            // Check if category is active (if category_id is provided)
+            // Check if category is active
             if (isset($data['category_id'])) {
                 $this->validateCategoryStatus($data['category_id'], $data['status'] ?? 'active');
             }
@@ -70,7 +99,18 @@ class ProductService extends BaseService
             }
 
             $data = $this->prepareProductData($data, $userId);
+            
+            // Extract discount data
+            $discountData = $this->extractDiscountData($data);
+            
             $product = $this->repository->create($data);
+            
+            // Create discount if provided
+            if ($discountData) {
+                $this->discountRepository->upsertForProduct($product->id, $discountData);
+                $product->refresh();
+            }
+            
             $this->createPriceUpdateRecord($product, null, $data, $userId);
             $this->afterCreate($product, $data);
 
@@ -90,8 +130,24 @@ class ProductService extends BaseService
             $oldValues = $this->getOldProductValues($product);
             $data = $this->handleImageUpdate($product, $data, $image, $imageRemoved);
             $data = $this->prepareProductData($data, $userId, $product);
+            
+            // Extract discount data
+            $discountData = $this->extractDiscountData($data);
+            
             $priceChanged = $this->hasPriceChanged($oldValues, $data, $product);
+            
             $product = $this->repository->update($product, $data);
+            
+            // Handle discount update
+            if ($discountData) {
+                $this->discountRepository->upsertForProduct($product->id, $discountData);
+            } elseif (isset($data['discount_type']) && $data['discount_type'] === 'none') {
+                // Deactivate existing discounts
+                $this->discountRepository->deactivateForProduct($product->id);
+            }
+            
+            $product->refresh();
+            
             if ($priceChanged) {
                 $finalNewData = $this->getFinalNewValues($oldValues, $data);
                 $this->createPriceUpdateRecord($product, $oldValues, $finalNewData, $userId);
@@ -109,6 +165,10 @@ class ProductService extends BaseService
             if ($product->image) {
                 $this->imageService->deleteProductImage($product->image);
             }
+            
+            // Delete associated discounts
+            $this->discountRepository->deleteForProduct($product->id);
+            
             $result = $this->repository->delete($product);
             $this->afterDelete($product);
 
@@ -116,14 +176,6 @@ class ProductService extends BaseService
         }, 'Failed to delete product');
     }
 
-    /**
-     * Toggle product status with category validation.
-     *
-     * @param Product $product
-     * @param int $userId
-     * @return Product
-     * @throws BusinessException if trying to activate product with inactive category
-     */
     public function toggleStatus(Product $product, int $userId): Product
     {
         return $this->transaction(function () use ($product, $userId) {       
@@ -146,16 +198,39 @@ class ProductService extends BaseService
     }
 
     /**
+     * Extract discount data from product data.
+     */
+    protected function extractDiscountData(array &$data): ?array
+    {
+        if (!isset($data['discount_type']) || $data['discount_type'] === 'none') {
+            return null;
+        }
+
+        if (!isset($data['discount_value']) || $data['discount_value'] <= 0) {
+            return null;
+        }
+
+        $discountData = [
+            'discount_type' => $data['discount_type'],
+            'discount_value' => $data['discount_value'],
+            'start_date' => $data['discount_start_date'] ?? null,
+            'end_date' => $data['discount_end_date'] ?? null,
+            'status' => 'active',
+        ];
+
+        // Remove discount fields from product data
+        unset($data['discount_type'], $data['discount_value'], $data['discount_start_date'], $data['discount_end_date']);
+
+        return $discountData;
+    }
+
+    /**
      * Validate category status before activating product.
-     *
-     * @param int $categoryId
-     * @param string $desiredProductStatus
-     * @throws BusinessException if category is inactive
      */
     private function validateCategoryStatus(int $categoryId, string $desiredProductStatus): void
     {
         if ($desiredProductStatus !== 'active') {
-            return; // No validation needed for inactive products
+            return;
         }
 
         $category = $this->categoryRepository->find($categoryId);
@@ -178,11 +253,9 @@ class ProductService extends BaseService
 
     protected function prepareProductData(array $data, int $userId, ?Product $product = null): array
     {
-        $discountType = $data['discount_type'] ?? $product?->discount_type ?? 'none';
-        if ($discountType === 'none') {
-            $data['discount_value'] = null;
-        }        
-
+        // Discount fields are now handled by ProductDiscount model
+        // No need to set discount_type or discount_value on product
+        
         return $data;
     }
 
@@ -205,17 +278,19 @@ class ProductService extends BaseService
 
     protected function getOldProductValues(Product $product): array
     {
+        $activeDiscount = $product->activeDiscount();
+        
         return [
             'regular_price' => $product->regular_price,
-            'discount_type' => $product->discount_type,
-            'discount_value' => $product->discount_value,
+            'discount_type' => $activeDiscount?->discount_type,
+            'discount_value' => $activeDiscount?->discount_value,
             'stock_quantity' => $product->stock_quantity,
         ];
     }
  
     protected function hasPriceChanged(array $oldValues, array $newData, Product $product): bool
     {
-        $priceFields = ['regular_price', 'discount_type', 'discount_value', 'stock_quantity'];
+        $priceFields = ['regular_price', 'stock_quantity'];
 
         foreach ($priceFields as $field) {
             $oldValue = $oldValues[$field] ?? null;
@@ -229,6 +304,20 @@ class ProductService extends BaseService
                 return true;
             }
         }
+        
+        // Check discount changes via ProductDiscount
+        $product->refresh();
+        $newDiscount = $product->activeDiscount();
+        
+        $oldDiscountType = $oldValues['discount_type'];
+        $newDiscountType = $newDiscount?->discount_type;
+        
+        $oldDiscountValue = $oldValues['discount_value'];
+        $newDiscountValue = $newDiscount?->discount_value;
+        
+        if ($oldDiscountType !== $newDiscountType || $oldDiscountValue !== $newDiscountValue) {
+            return true;
+        }
 
         return false;
     }
@@ -237,27 +326,28 @@ class ProductService extends BaseService
     {
         return [
             'regular_price' => $newData['regular_price'] ?? $oldValues['regular_price'],
-            'discount_type' => $newData['discount_type'] ?? $oldValues['discount_type'],
-            'discount_value' => array_key_exists('discount_value', $newData) 
-                ? $newData['discount_value'] 
-                : $oldValues['discount_value'],
             'stock_quantity' => $newData['stock_quantity'] ?? $oldValues['stock_quantity'],
         ];
     }
  
     protected function createPriceUpdateRecord(Product $product, ?array $oldValues, array $newData, int $userId): void
     {
+        $product->refresh();
+        
         $oldRegularPrice = $oldValues['regular_price'] ?? null;
         $oldDiscountType = $oldValues['discount_type'] ?? null;
         $oldDiscountValue = $oldValues['discount_value'] ?? null;
         $oldStockQuantity = $oldValues['stock_quantity'] ?? null;
 
         $newRegularPrice = $newData['regular_price'] ?? null;
-        $newDiscountType = $newData['discount_type'] ?? 'none';
-        $newDiscountValue = $newData['discount_value'] ?? null;
         $newStockQuantity = $newData['stock_quantity'] ?? null;
+        
+        // Get discount info from ProductDiscount
+        $activeDiscount = $product->activeDiscount();
+        $newDiscountType = $activeDiscount?->discount_type ?? 'none';
+        $newDiscountValue = $activeDiscount?->discount_value;
 
-        $newSellingPrice = $this->calculateSellingPrice($newRegularPrice, $newDiscountType, $newDiscountValue);
+        $newSellingPrice = $product->selling_price;
 
         $this->priceUpdateRepository->create([
             'product_id' => $product->id,

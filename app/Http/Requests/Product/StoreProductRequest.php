@@ -7,42 +7,27 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
- * Store Product Request
- * 
- * Validates and normalizes data for creating a new product.
+ * Store Product Request - Updated with ProductDiscount Support
  */
 class StoreProductRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     *
-     * @return bool
-     */
     public function authorize(): bool
     {
-        return true; // Authorization handled by middleware
+        return true;
     }
 
-    /**
-     * Prepare the data for validation.
-     *
-     * @return void
-     */
     protected function prepareForValidation(): void
     {
         $dataToMerge = [];
 
-        // Normalize name
         if ($this->has('name') && $this->name !== null && $this->name !== '') {
             $dataToMerge['name'] = trim((string) $this->name);
         }
 
-        // Normalize item_code (uppercase)
         if ($this->has('item_code') && $this->item_code !== null && $this->item_code !== '') {
             $dataToMerge['item_code'] = strtoupper(trim((string) $this->item_code));
         }
 
-        // Normalize prices
         if ($this->has('regular_price') && $this->regular_price !== null && $this->regular_price !== '') {
             $dataToMerge['regular_price'] = (float) $this->regular_price;
         }
@@ -55,24 +40,20 @@ class StoreProductRequest extends FormRequest
             $dataToMerge['stock_quantity'] = (float) $this->stock_quantity;
         }
 
-        // Normalize category_id
         if ($this->has('category_id') && $this->category_id !== null && $this->category_id !== '') {
             $dataToMerge['category_id'] = (int) $this->category_id;
         }
 
-        // Normalize stock_unit
         if ($this->has('stock_unit') && $this->stock_unit !== null && $this->stock_unit !== '') {
             $dataToMerge['stock_unit'] = trim((string) $this->stock_unit);
         }
 
-        // Normalize discount_type with default
         if ($this->has('discount_type') && $this->discount_type !== null && $this->discount_type !== '') {
             $dataToMerge['discount_type'] = strtolower(trim((string) $this->discount_type));
         } else {
             $dataToMerge['discount_type'] = 'none';
         }
 
-        // Normalize product_type with default
         if ($this->has('product_type') && $this->product_type !== null && $this->product_type !== '') {
             $dataToMerge['product_type'] = strtolower(trim((string) $this->product_type));
         } else {
@@ -87,29 +68,21 @@ class StoreProductRequest extends FormRequest
             $dataToMerge['max_quantity'] = trim((string) $this->max_quantity);
         }
 
-        // Normalize status with default
         if ($this->has('status') && in_array($this->status, ['active', 'inactive'])) {
             $dataToMerge['status'] = $this->status;
         } else {
             $dataToMerge['status'] = 'active';
         }
 
-        // Clear discount_value if discount_type is 'none'
         if (($dataToMerge['discount_type'] ?? 'none') === 'none') {
             $dataToMerge['discount_value'] = null;
         }
-
 
         if (!empty($dataToMerge)) {
             $this->merge($dataToMerge);
         }
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
-     */
     public function rules(): array
     {
         return [
@@ -158,5 +131,3 @@ class StoreProductRequest extends FormRequest
         ];
     }
 }
-
-

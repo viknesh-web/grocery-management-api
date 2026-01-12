@@ -4,14 +4,19 @@ namespace App\Services;
 
 use App\Repositories\PriceUpdateRepository;
 use App\Repositories\ProductRepository;
+use App\Repositories\ProductDiscountRepository;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * Price Update Service - Updated with ProductDiscount Integration
+ */
 class PriceUpdateService extends BaseService
 {
     public function __construct(
         private PriceUpdateRepository $repository,
-        private ProductRepository $productRepository
+        private ProductRepository $productRepository,
+        private ProductDiscountRepository $discountRepository
     ) {}
 
     public function bulkUpdatePrices(array $updates, int $userId): array
@@ -31,7 +36,6 @@ class PriceUpdateService extends BaseService
         return $this->transaction(function () use ($updates, $userId, &$results, &$errors) {
             foreach ($updates as $index => $update) {
                 try {
-                    // Validate required fields
                     if (!isset($update['product_id'])) {
                         $errors[] = [
                             'index' => $index,
@@ -44,51 +48,37 @@ class PriceUpdateService extends BaseService
                     $product = $this->productRepository->findOrFailWithLock($productId);
                     $oldValues = $this->getOldProductValues($product);
                     $updateData = $this->prepareProductUpdateData($update, $oldValues, $product);
+                    $discountData = $this->prepareDiscountUpdateData($update, $oldValues, $product);
+                    
                     $hasPriceChange = $this->hasPriceChange($oldValues, $updateData);
                     $hasStockChange = $this->hasStockChange($oldValues, $updateData);
-                    $hasChanges = $hasPriceChange || $hasStockChange;
-                    $hasDiscountChange = false;
+                    $hasDiscountChange = $this->hasDiscountChange($oldValues, $discountData);
+                    $hasChanges = $hasPriceChange || $hasStockChange || $hasDiscountChange;
 
-                    // Update product if there are changes (business logic - orchestration)
-                    if ($hasChanges) {
+                    // Update product if there are changes
+                    if ($hasPriceChange || $hasStockChange) {
                         $product = $this->productRepository->update($product, array_merge($updateData, [
                             'updated_by' => $userId,
                         ]));
-
-                        $product->refresh();
-
-                        $newValues = $this->getNewProductValues($product);
-                        $hasDiscountChange = $this->hasDiscountValueChange($oldValues, $newValues);
-                        $newSellingPrice = $this->calculateSellingPrice(
-                            $newValues['regular_price'],
-                            $newValues['discount_type'],
-                            $newValues['discount_value']
-                        );
-
-                        if ($hasPriceChange || $hasStockChange || $hasDiscountChange) {
-                            $this->createPriceUpdateRecord($product, $oldValues, $newValues, $newSellingPrice, $userId);
-                        }
-
-                        $hasChanges = $hasPriceChange || $hasStockChange || $hasDiscountChange;
-                    } else {
-                        // Even if no direct updates, check if discount changed (external discount updates)
-                        $product->refresh();
-                        $newValues = $this->getNewProductValues($product);
-                        $hasDiscountChange = $this->hasDiscountValueChange($oldValues, $newValues);
-
-                        if ($hasDiscountChange) {
-                            // Discount changed externally, create price update record
-                            $newSellingPrice = $this->calculateSellingPrice(
-                                $newValues['regular_price'],
-                                $newValues['discount_type'],
-                                $newValues['discount_value']
-                            );
-                            $this->createPriceUpdateRecord($product, $oldValues, $newValues, $newSellingPrice, $userId);
-                            $hasChanges = true;
+                    }
+                    
+                    // Update discount if changed
+                    if ($hasDiscountChange) {
+                        if ($discountData && $discountData['discount_type'] !== 'none') {
+                            $this->discountRepository->upsertForProduct($productId, $discountData);
+                        } else {
+                            $this->discountRepository->deactivateForProduct($productId);
                         }
                     }
 
-                    // Build result for this product
+                    $product->refresh();
+
+                    if ($hasChanges) {
+                        $newValues = $this->getNewProductValues($product);
+                        $newSellingPrice = $product->selling_price;
+                        $this->createPriceUpdateRecord($product, $oldValues, $newValues, $newSellingPrice, $userId);
+                    }
+
                     $results[] = [
                         'product_id' => $product->id,
                         'product_name' => $product->name,
@@ -100,8 +90,6 @@ class PriceUpdateService extends BaseService
                         ],
                     ];
                 } catch (\Exception $e) {
-                    // Log individual product update error but continue with others
-                    // This is business logic - partial failure handling
                     Log::warning('Failed to update product in bulk update', [
                         'product_id' => $update['product_id'] ?? null,
                         'index' => $index,
@@ -147,9 +135,8 @@ class PriceUpdateService extends BaseService
     public function getProductsForPriceUpdate(array $filters = []): \Illuminate\Database\Eloquent\Collection
     {
         $repositoryFilters = ['status' => 'active'];
-        $relations = ['category:id,name'];
+        $relations = ['category:id,name', 'discounts'];
 
-        // Apply search filter
         if (isset($filters['search'])) {
             $repositoryFilters['search'] = $filters['search'];
         }
@@ -184,8 +171,8 @@ class PriceUpdateService extends BaseService
         return [
             'regular_price' => $product->regular_price,
             'stock_quantity' => $product->stock_quantity,
-            'discount_type' => $activeDiscount ? $activeDiscount->discount_type : null,
-            'discount_value' => $activeDiscount ? $activeDiscount->discount_value : null,
+            'discount_type' => $activeDiscount?->discount_type ?? 'none',
+            'discount_value' => $activeDiscount?->discount_value,
         ];
     }
 
@@ -196,8 +183,8 @@ class PriceUpdateService extends BaseService
         return [
             'regular_price' => $product->regular_price,
             'stock_quantity' => $product->stock_quantity,
-            'discount_type' => $activeDiscount ? $activeDiscount->discount_type : null,
-            'discount_value' => $activeDiscount ? $activeDiscount->discount_value : null,
+            'discount_type' => $activeDiscount?->discount_type ?? 'none',
+            'discount_value' => $activeDiscount?->discount_value,
         ];
     }
   
@@ -221,6 +208,32 @@ class PriceUpdateService extends BaseService
 
         return $updateData;
     }
+    
+    protected function prepareDiscountUpdateData(array $update, array $oldValues, \App\Models\Product $product): ?array
+    {
+        if (!isset($update['discount_type'])) {
+            return null;
+        }
+
+        $newDiscountType = $update['discount_type'];
+        $newDiscountValue = $update['discount_value'] ?? null;
+
+        if ($newDiscountType === 'none') {
+            return ['discount_type' => 'none'];
+        }
+
+        if ($newDiscountValue === null || $newDiscountValue <= 0) {
+            return null;
+        }
+
+        return [
+            'discount_type' => $newDiscountType,
+            'discount_value' => $newDiscountValue,
+            'start_date' => $update['discount_start_date'] ?? null,
+            'end_date' => $update['discount_end_date'] ?? null,
+            'status' => 'active',
+        ];
+    }
   
     protected function hasPriceChange(array $oldValues, array $updateData): bool
     {
@@ -240,19 +253,25 @@ class PriceUpdateService extends BaseService
         return (float) $updateData['stock_quantity'] != (float) $oldValues['stock_quantity'];
     }
  
-    protected function hasDiscountValueChange(array $oldValues, array $newValues): bool
+    protected function hasDiscountChange(array $oldValues, ?array $newDiscountData): bool
     {
-        $oldType = $oldValues['discount_type'] ?? null;
-        $oldValue = $oldValues['discount_value'] ?? null;
-        $newType = $newValues['discount_type'] ?? null;
-        $newValue = $newValues['discount_value'] ?? null;
+        if ($newDiscountData === null) {
+            return false;
+        }
 
-        // Compare discount type
+        $oldType = $oldValues['discount_type'] ?? 'none';
+        $oldValue = $oldValues['discount_value'];
+        $newType = $newDiscountData['discount_type'] ?? 'none';
+        $newValue = $newDiscountData['discount_value'] ?? null;
+
         if ($oldType !== $newType) {
             return true;
         }
 
-        // Compare discount value (handle numeric comparison)
+        if ($newType === 'none') {
+            return false;
+        }
+
         if ($oldValue !== $newValue) {
             if (is_numeric($oldValue) && is_numeric($newValue)) {
                 return (float) $oldValue !== (float) $newValue;
@@ -263,7 +282,6 @@ class PriceUpdateService extends BaseService
         return false;
     }
 
-  
     protected function createPriceUpdateRecord(
         \App\Models\Product $product,
         array $oldValues,
@@ -284,26 +302,5 @@ class PriceUpdateService extends BaseService
             'new_selling_price' => $newSellingPrice,
             'updated_by' => $userId,
         ]);
-    }
-
-    protected function calculateSellingPrice(?float $regularPrice, ?string $discountType, ?float $discountValue): float
-    {
-        // Handle null or invalid regular price
-        if ($regularPrice === null || $regularPrice <= 0) {
-            return 0.0;
-        }
-
-        if (!$discountType || $discountType === 'none' || !$discountValue || $discountValue <= 0) {
-            return round((float) $regularPrice, 2);
-        }
-
-        if ($discountType === 'percentage') {
-            $discountAmount = $regularPrice * ($discountValue / 100);
-        } else {
-            $discountAmount = $discountValue;
-        }
-        $sellingPrice = $regularPrice - $discountAmount;
-
-        return max(0, round((float) $sellingPrice, 2));
     }
 }
