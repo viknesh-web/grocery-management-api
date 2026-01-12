@@ -141,7 +141,7 @@ class PriceUpdateService extends BaseService
     public function getProductsForPriceUpdate(array $filters = []): \Illuminate\Database\Eloquent\Collection
     {
         $repositoryFilters = ['status' => 'active'];
-        $relations = ['category:id,name', 'discounts'];
+        $relations = ['category:id,name', 'productDiscount'];
 
         if (isset($filters['search'])) {
             $repositoryFilters['search'] = $filters['search'];

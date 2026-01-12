@@ -27,19 +27,7 @@ class ProductService extends BaseService
 
     public function getPaginated(array $filters = [], int $perPage = 15): \Illuminate\Contracts\Pagination\LengthAwarePaginator
     {
-        $relations = ['category:id,name,status', 'discounts' => function ($query) {
-            $query->where('status', 'active')
-                ->where(function ($q) {
-                    $now = now();
-                    $q->whereNull('start_date')
-                        ->orWhere('start_date', '<=', $now);
-                })
-                ->where(function ($q) {
-                    $now = now();
-                    $q->whereNull('end_date')
-                        ->orWhere('end_date', '>=', $now);
-                });
-        }];
+        $relations = ['category:id,name,status', 'productDiscount'];
         
         $products = $this->repository->paginate($filters, $perPage, $relations);
         $totalFiltered = $this->repository->countByFilters($filters);
@@ -55,19 +43,7 @@ class ProductService extends BaseService
         return $this->handle(function () use ($id) {
             $relations = [
                 'category:id,name,status',
-                'discounts' => function ($query) {
-                    $query->where('status', 'active')
-                        ->where(function ($q) {
-                            $now = now();
-                            $q->whereNull('start_date')
-                                ->orWhere('start_date', '<=', $now);
-                        })
-                        ->where(function ($q) {
-                            $now = now();
-                            $q->whereNull('end_date')
-                                ->orWhere('end_date', '>=', $now);
-                        });
-                }
+                'productDiscount'
             ];
             
             return $this->repository->find($id, $relations);
@@ -79,7 +55,7 @@ class ProductService extends BaseService
         return $this->handle(function () use ($id) {
             $relations = [
                 'category:id,name,status',
-                'discounts'
+                'productDiscount'
             ];
             
             return $this->repository->findOrFail($id, $relations);

@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Product extends Model
 {
@@ -136,6 +137,23 @@ class Product extends Model
                     });
             })
             ->first();
+    }
+
+    public function productDiscount(): HasOne
+    {
+        return $this->hasOne(ProductDiscount::class)
+            ->where('status', 'active')
+            ->where(function ($q) {
+                $now = now();
+                $q->whereNull('start_date')
+                  ->orWhere('start_date', '<=', $now);
+            })
+            ->where(function ($q) {
+                $now = now();
+                $q->whereNull('end_date')
+                  ->orWhere('end_date', '>=', $now);
+            })
+            ->latest('id');
     }
 
     /**
