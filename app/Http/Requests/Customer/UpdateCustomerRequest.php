@@ -52,6 +52,13 @@ class UpdateCustomerRequest extends FormRequest
                 : null;
         }
 
+        if ($this->has('email')) {
+            $emailValue = $this->input('email');
+            $dataToMerge['email'] = ($emailValue !== null && $emailValue !== '') 
+                ? strtolower(trim((string) $emailValue)) 
+                : null;
+        }
+
         // Normalize landmark
         if ($this->has('landmark') && $this->landmark !== null && $this->landmark !== '') {
             $dataToMerge['landmark'] = trim((string) $this->landmark);
@@ -96,6 +103,14 @@ class UpdateCustomerRequest extends FormRequest
                 'string',
                 'regex:' . PhoneNumberHelper::getValidationRegex(),
             ],
+            'email' => [
+                'sometimes',
+                'nullable',
+                'string',
+                'email',
+                'max:255',
+                Rule::unique('customers', 'email')->ignore($customerId),
+            ],
             'landmark' => ['nullable', 'string', 'max:255'],
             'remarks' => ['nullable', 'string', 'max:1000'],
             'status' => ['sometimes', 'string', Rule::in(['active', 'inactive'])],
@@ -115,6 +130,8 @@ class UpdateCustomerRequest extends FormRequest
         return [
             'whatsapp_number.regex' => PhoneNumberHelper::getValidationErrorMessage(),
             'name.regex' => 'Please enter a valid name (2-100 characters, letters only)',
+            'email.email' => 'Please enter a valid email address',
+            'email.unique' => 'This email address is already registered',
         ];
     }
 }

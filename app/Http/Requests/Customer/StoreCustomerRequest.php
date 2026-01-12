@@ -42,6 +42,13 @@ class StoreCustomerRequest extends FormRequest
             $dataToMerge['whatsapp_number'] = PhoneNumberHelper::normalize($this->whatsapp_number);
         }
 
+        if ($this->has('email')) {
+            $emailValue = $this->input('email');
+            $dataToMerge['email'] = ($emailValue !== null && $emailValue !== '') 
+                ? strtolower(trim((string) $emailValue)) 
+                : null;
+        }
+
         // Normalize address
         if ($this->has('address')) {
             $addressValue = $this->input('address');
@@ -93,6 +100,13 @@ class StoreCustomerRequest extends FormRequest
                 'regex:' . PhoneNumberHelper::getValidationRegex(),
                 'unique:customers,whatsapp_number',
             ],
+             'email' => [
+                'nullable',
+                'string',
+                'email',
+                'max:255',
+                'unique:customers,email',
+            ],
             'landmark' => ['nullable', 'string', 'max:255'],
             'remarks' => ['nullable', 'string', 'max:1000'],
             'status' => ['sometimes', 'string', Rule::in(['active', 'inactive'])],
@@ -112,6 +126,8 @@ class StoreCustomerRequest extends FormRequest
         return [
             'whatsapp_number.regex' => PhoneNumberHelper::getValidationErrorMessage(),
             'name.regex' => 'Please enter a valid name (2-100 characters, letters only)',
+            'email.email' => 'Please enter a valid email address',
+            'email.unique' => 'This email address is already registered',
         ];
     }
 }

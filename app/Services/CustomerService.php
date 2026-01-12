@@ -123,6 +123,7 @@ class CustomerService extends BaseService
             'name' => $customer->name,
             'whatsapp_number' => $customer->whatsapp_number,
             'address' => $customer->address,
+            'email' => $customer->email,
             'landmark' => $customer->landmark,
             'remarks' => $customer->remarks,
             'status' => $customer->status,

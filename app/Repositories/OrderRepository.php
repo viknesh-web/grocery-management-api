@@ -248,7 +248,7 @@ class OrderRepository extends BaseRepository
             'pending' => Order::where('status', 'pending')->count(),
             'confirmed' => Order::where('status', 'confirmed')->count(),
             'processing' => Order::where('status', 'processing')->count(),
-            'completed' => Order::where('status', 'completed')->count(),
+            'delivered' => Order::where('status', 'delivered')->count(),
             'cancelled' => Order::where('status', 'cancelled')->count(),
             'today' => Order::whereDate('created_at', today())->count(),
         ];
