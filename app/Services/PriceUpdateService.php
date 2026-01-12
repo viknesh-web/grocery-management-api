@@ -8,9 +8,7 @@ use App\Repositories\ProductDiscountRepository;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Log;
 
-/**
- * Price Update Service - Updated with ProductDiscount Integration
- */
+
 class PriceUpdateService extends BaseService
 {
     public function __construct(
@@ -55,22 +53,30 @@ class PriceUpdateService extends BaseService
                     $hasDiscountChange = $this->hasDiscountChange($oldValues, $discountData);
                     $hasChanges = $hasPriceChange || $hasStockChange || $hasDiscountChange;
 
-                    // Update product if there are changes
+                    if ($hasDiscountChange) {
+                        if ($discountData && $discountData['discount_type'] !== 'none') {
+                            $this->discountRepository->upsertForProduct($productId, $discountData);
+                            Log::info('Discount updated for product', [
+                                'product_id' => $productId,
+                                'discount_type' => $discountData['discount_type'],
+                                'discount_value' => $discountData['discount_value'],
+                            ]);
+                        } else {
+                            $this->discountRepository->deactivateForProduct($productId);
+                            Log::info('Discount deactivated for product', [
+                                'product_id' => $productId,
+                            ]);
+                        }
+                    }
+
+                    // Then update product if there are price/stock changes
                     if ($hasPriceChange || $hasStockChange) {
                         $product = $this->productRepository->update($product, array_merge($updateData, [
                             'updated_by' => $userId,
                         ]));
                     }
-                    
-                    // Update discount if changed
-                    if ($hasDiscountChange) {
-                        if ($discountData && $discountData['discount_type'] !== 'none') {
-                            $this->discountRepository->upsertForProduct($productId, $discountData);
-                        } else {
-                            $this->discountRepository->deactivateForProduct($productId);
-                        }
-                    }
 
+                    // Refresh to get updated discount relationship
                     $product->refresh();
 
                     if ($hasChanges) {
@@ -211,6 +217,7 @@ class PriceUpdateService extends BaseService
     
     protected function prepareDiscountUpdateData(array $update, array $oldValues, \App\Models\Product $product): ?array
     {
+        // Check if discount data is present in the update
         if (!isset($update['discount_type'])) {
             return null;
         }
@@ -218,17 +225,24 @@ class PriceUpdateService extends BaseService
         $newDiscountType = $update['discount_type'];
         $newDiscountValue = $update['discount_value'] ?? null;
 
+        // Handle "none" discount type
         if ($newDiscountType === 'none') {
             return ['discount_type' => 'none'];
         }
 
+        // Validate discount value
         if ($newDiscountValue === null || $newDiscountValue <= 0) {
+            Log::warning('Invalid discount value in bulk update', [
+                'product_id' => $product->id,
+                'discount_type' => $newDiscountType,
+                'discount_value' => $newDiscountValue,
+            ]);
             return null;
         }
 
         return [
             'discount_type' => $newDiscountType,
-            'discount_value' => $newDiscountValue,
+            'discount_value' => (float) $newDiscountValue,
             'start_date' => $update['discount_start_date'] ?? null,
             'end_date' => $update['discount_end_date'] ?? null,
             'status' => 'active',
@@ -264,14 +278,17 @@ class PriceUpdateService extends BaseService
         $newType = $newDiscountData['discount_type'] ?? 'none';
         $newValue = $newDiscountData['discount_value'] ?? null;
 
+        // If old type is 'none' but we're trying to set a new type
         if ($oldType !== $newType) {
             return true;
         }
 
+        // If new type is 'none', only return true if old type wasn't 'none'
         if ($newType === 'none') {
-            return false;
+            return $oldType !== 'none';
         }
 
+        // Compare discount values
         if ($oldValue !== $newValue) {
             if (is_numeric($oldValue) && is_numeric($newValue)) {
                 return (float) $oldValue !== (float) $newValue;

@@ -139,7 +139,7 @@ class Order extends Model
      */
     public function scopeCompleted(Builder $query): Builder
     {
-        return $query->where('status', 'completed');
+        return $query->where('status', 'delivered');
     }
 
      /**

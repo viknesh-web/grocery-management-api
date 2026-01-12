@@ -28,7 +28,8 @@ class OrderRequest extends FormRequest
         return [
             'search' => ['sometimes','max:255'],
             'status' => ['sometimes', 'string', Rule::in(['pending', 'confirmed', 'processing', 'delivered', 'cancelled'])],
-            'customer_ids' => ['sometimes', 'array'],
+            'customer_id' => ['sometimes', 'integer', 'exists:customers,id'], 
+            'customer_ids' => ['sometimes', 'array'], 
             'customer_ids.*' => ['integer', 'exists:customers,id'],
             'customer_address' => ['sometimes', 'string', 'max:255'],
             'date_from' => ['sometimes', 'date'],
@@ -47,10 +48,15 @@ class OrderRequest extends FormRequest
      */
     public function getFilters(): array
     {
+
+        $customerIds = $this->get('customer_ids');
+        if (!$customerIds && $this->has('customer_id')) {
+            $customerIds = [$this->get('customer_id')];
+        }
         return [
             'search' => $this->get('search'),
             'status' => $this->get('status'),
-            'customer_ids' => $this->get('customer_ids'),
+            'customer_ids' => $customerIds,
             'customer_address' => $this->get('query'),
             'date_from' => $this->get('date_from'),
             'date_to' => $this->get('date_to'),
