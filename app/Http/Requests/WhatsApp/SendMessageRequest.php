@@ -54,13 +54,7 @@ class SendMessageRequest extends FormRequest
             'async' => ['sometimes', 'boolean'],
         ];
 
-        // Conditional validation based on PDF type
-        if ($pdfType === 'regular') {
-            $rules['product_ids'] = ['required', 'array', 'min:1'];
-            $rules['product_ids.*'] = ['required', 'integer', 'exists:products,id'];
-        } else {
-            $rules['custom_pdf'] = ['required', 'file', 'mimes:pdf', 'max:10240'];
-        }
+        // Conditional validation based on PDF type     
 
         return $rules;
     }

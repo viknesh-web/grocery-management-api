@@ -2,213 +2,319 @@
 
 namespace App\Http\Controllers\API;
 
-use App\Exceptions\BusinessException;
-use App\Exceptions\ValidationException;
-use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\WhatsApp\GeneratePriceListRequest;
-use App\Http\Requests\WhatsApp\SendMessageRequest;
-use App\Http\Requests\WhatsApp\SendProductUpdateRequest;
-use App\Http\Requests\WhatsApp\SendTestMessageRequest;
-use App\Http\Requests\WhatsApp\ValidateNumberRequest;
 use App\Models\Customer;
 use App\Services\PdfService;
 use App\Services\WhatsAppService;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Log;
 
 /**
  * WhatsApp Controller
+ * 
+ * Handles WhatsApp integration for sending price lists and messages to customers.
  */
 class WhatsAppController extends Controller
 {
-    public function __construct(
-        private WhatsAppService $whatsAppService,
-        private PdfService $pdfService
-    ) {}
+    protected WhatsAppService $whatsAppService;
+    protected PdfService $pdfService;
 
-    public function generatePriceList(GeneratePriceListRequest $request): JsonResponse
+    public function __construct(WhatsAppService $whatsAppService, PdfService $pdfService)
     {
-        try {
-            $productIds = $request->input('product_ids', []);
-            $pdfLayout = $request->input('pdf_layout', 'regular');
+        $this->whatsAppService = $whatsAppService;
+        $this->pdfService = $pdfService;
+    }
 
-            $pdfPath = $this->pdfService->generatePriceList($productIds, $pdfLayout);
-            $pdfUrl = $this->pdfService->getPdfUrl($pdfPath);
+    /**
+     * Generate price list PDF.
+     */
+    public function generatePriceList(Request $request): JsonResponse
+    {
+        $productIds = $request->get('product_ids', []);
 
-            return ApiResponse::success([
+        $pdfPath = $this->pdfService->generatePriceList($productIds);
+        $pdfUrl = $this->pdfService->getPdfUrl($pdfPath);
+
+        return response()->json([
+            'message' => 'Price list PDF generated successfully',
+            'data' => [
                 'pdf_path' => $pdfPath,
                 'pdf_url' => $pdfUrl,
-            ], 'Price list PDF generated successfully');
-        } catch (BusinessException $e) {
-            return ApiResponse::error($e->getMessage(), null, 400);
-        } catch (\Exception $e) {
-            return ApiResponse::error(
-                'Failed to generate PDF. Please try again later.',
-                null,
-                500
-            );
-        }
+            ],
+        ], 200);
     }
-  
-    public function sendMessage(SendMessageRequest $request): JsonResponse
+
+    /**
+     * Send WhatsApp message to customers.
+     */
+    public function sendMessage(Request $request): JsonResponse
     {
-        try {
-            $sendToAll = $request->boolean('send_to_all', false);
-            $customerIds = $sendToAll ? null : $request->getCustomerIds();
-            $message = $request->input('message_template') ?? $request->input('message');
-            $includePdf = $request->boolean('include_pdf', true);
-            $productIds = $request->getProductIds();
-            $templateId = $request->input('template_id');
-            $contentVariables = $request->getContentVariables();
-            $pdfType = $request->input('pdf_type', 'regular');
-            $pdfLayout = $request->input('pdf_layout', 'regular');
-            $async = $request->boolean('async', true);
+        // Handle JSON-encoded arrays from FormData
+        $pdfType = $request->get('pdf_type', 'regular');
+        
+        $sendToAll = $request->boolean('send_to_all', false);
+        
+        $validationRules = [
+            'send_to_all' => ['sometimes', 'boolean'],
+            'customer_ids' => $sendToAll ? ['nullable'] : ['required'],
+            'message_template' => ['nullable', 'string', 'max:1000'],
+            'message' => ['nullable', 'string', 'max:1000'], // Alias for message_template
+            'include_pdf' => ['sometimes', 'boolean'],
+            'template_id' => ['nullable', 'string'], // Twilio Content Template ID
+            'content_variables' => ['nullable'],
+            'pdf_type' => ['sometimes', 'string', 'in:regular,custom'],
+        ];
+Log::debug('1');
+        // Conditional validation based on PDF type
+        if ($pdfType === 'regular') {
+            $validationRules['product_ids.*'] = ['required', 'integer', 'exists:products,id'];
+        } else {
+            $validationRules['custom_pdf'] = ['required', 'file', 'mimes:pdf', 'max:10240']; // Max 10MB
+        }
+Log::debug('2');
 
-            // Handle custom PDF upload
-            $customPdfUrl = null;
-            if ($pdfType === 'custom' && $request->hasFile('custom_pdf')) {
-                $customPdfUrl = $this->pdfService->uploadCustomPdf($request->file('custom_pdf'));
+        $request->validate($validationRules);
+
+        // Parse JSON-encoded arrays from FormData
+        $customerIdsJson = $request->get('customer_ids');
+        $customerIds = null;
+        if ($customerIdsJson) {
+            if (is_string($customerIdsJson)) {
+                $customerIds = json_decode($customerIdsJson, true);
+            } else {
+                $customerIds = $customerIdsJson;
             }
+        }
+Log::debug('3');
 
-            $results = $this->whatsAppService->sendPriceListToCustomers(
-                $customerIds,
-                $message,
-                $includePdf,
-                $productIds,
-                $templateId,
-                $contentVariables,
-                $customPdfUrl,
-                $pdfLayout,
-                $async
-            );
-
-            // Handle async response
-            if (isset($results['status']) && $results['status'] === 'queued') {
-                return ApiResponse::success([
-                    'queued' => true,
-                    'customer_count' => $results['customer_count'],
-                    'message' => $results['message'],
-                ], $results['message']);
+        $productIdsJson = $request->get('product_ids');
+        $productIds = null;
+        if ($productIdsJson) {
+            if (is_string($productIdsJson)) {
+                $productIds = json_decode($productIdsJson, true);
+            } else {
+                $productIds = $productIdsJson;
             }
+        }
 
-            // Handle synchronous response
-            $successCount = collect($results)->where('success', true)->count();
-            $failureCount = count($results) - $successCount;
+        $productTypesJson = $request->get('product_types');
+        $productTypes = [];
+        if ($productTypesJson) {
+            if (is_string($productTypesJson)) {
+                $productTypes = json_decode($productTypesJson, true) ?? [];
+            } else {
+                $productTypes = $productTypesJson ?? [];
+            }
+        }
+Log::debug('4');
 
-            return ApiResponse::success([
+        $contentVariablesJson = $request->get('content_variables');
+        $contentVariables = null;
+        if ($contentVariablesJson) {
+            if (is_string($contentVariablesJson)) {
+                $contentVariables = json_decode($contentVariablesJson, true);
+            } else {
+                $contentVariables = $contentVariablesJson;
+            }
+        }
+        Log::debug('5');
+
+
+        // Validate customer_ids if provided and not sending to all
+        // if (!$sendToAll && $customerIds !== null && !empty($customerIds)) {
+        //     if (!is_array($customerIds)) {
+        //         return response()->json([
+        //             'message' => 'Invalid customer_ids format',
+        //             'errors' => ['customer_ids' => ['customer_ids must be an array']],
+        //         ], 422);
+        //     }
+        //     foreach ($customerIds as $id) {
+        //         if (!is_numeric($id) || !Customer::where('id', $id)->exists()) {
+        //             return response()->json([
+        //                 'message' => 'Invalid customer ID',
+        //                 'errors' => ['customer_ids' => ['One or more customer IDs are invalid']],
+        //             ], 422);
+        //         }
+        //     }
+        // }
+        
+        // Set customerIds to null if sending to all
+        $customerIds = $sendToAll ? null : $customerIds;
+        $message = $request->message_template ?? $request->message;
+        $includePdf = $request->boolean('include_pdf', true);
+        $templateId = $request->template_id;
+        Log::debug('6');
+
+        // Handle custom PDF upload
+        $customPdfUrl = null;
+        if ($pdfType === 'custom' && $request->hasFile('custom_pdf')) {
+            $file = $request->file('custom_pdf');
+            $filename = 'pdfs/custom-' . date('Y-m-d-H-i-s') . '-' . uniqid() . '.pdf';
+            $path = $file->storeAs('', $filename, 'public');
+            $customPdfUrl = $this->pdfService->getPdfUrl($path);
+        }
+Log::debug('7');
+
+        // Validate that template_id and message are not both provided
+        if (!empty($templateId) && !empty($message)) {
+            return response()->json([
+                'message' => 'Cannot use both template_id and message. Please provide either template_id (for Content Template) or message (for plain text).',
+                'errors' => [
+                    'template_id' => ['Cannot use template with plain text message'],
+                    'message' => ['Cannot use plain text message with template'],
+                ],
+            ], 422);
+        }
+Log::debug('8');
+
+        $results = $this->whatsAppService->sendPriceListToCustomers(
+            $customerIds,
+            $message,
+            $includePdf,
+            $productIds,
+            $templateId,
+            $contentVariables,
+            $customPdfUrl
+        );
+
+        $successCount = collect($results)->where('success', true)->count();
+        $failureCount = count($results) - $successCount;
+
+        return response()->json([
+            'message' => "Sent to {$successCount} customer(s), {$failureCount} failed",
+            'data' => [
                 'total' => count($results),
                 'successful' => $successCount,
                 'failed' => $failureCount,
                 'results' => $results,
-            ], "Sent to {$successCount} customer(s), {$failureCount} failed");
-        } catch (ValidationException $e) {
-            return ApiResponse::validationError($e->getErrors(), $e->getMessage());
-        } catch (BusinessException $e) {
-            return ApiResponse::error($e->getMessage(), null, 400);
-        } catch (\Exception $e) {
-            return ApiResponse::error(
-                'Failed to send WhatsApp messages. Please try again later.',
-                null,
-                500
-            );
-        }
+            ],
+        ], 200);
     }
-  
-    public function sendProductUpdate(SendProductUpdateRequest $request): JsonResponse
+
+    /**
+     * Send WhatsApp update with product selection (no customer selection).
+     */
+    public function sendProductUpdate(Request $request): JsonResponse
     {
-        try {
-            $productIds = $request->getProductIds();
-            $message = $request->input('message_template') ?? $request->input('message');
-            $includePdf = $request->boolean('include_pdf', true);
-            $templateId = $request->input('template_id');
-            $contentVariables = $request->getContentVariables();
-            $async = $request->boolean('async', true);
+        $request->validate([
+            'product_types' => ['sometimes', 'array'],
+            'product_types.*' => ['required', 'string', 'in:daily,standard'],
+            'message_template' => ['nullable', 'string', 'max:1000'],
+            'message' => ['nullable', 'string', 'max:1000'], // Alias for message_template
+            'include_pdf' => ['required'],
+            'template_id' => ['nullable', 'string'], // Twilio Content Template ID
+            'content_variables' => ['nullable', 'array'], // Variables for Content Template
+        ]);
 
-            $results = $this->whatsAppService->sendPriceListToCustomers(
-                null, 
-                $message,
-                $includePdf,
-                $productIds,
-                $templateId,
-                $contentVariables,
-                null, 
-                'regular', 
-                $async
-            );
+        $productIds = $request->product_ids;
+        $productTypes = $request->product_types ?? [];
+        $message = $request->message_template ?? $request->message;
+        $includePdf = $request->boolean('include_pdf', true);
+        $templateId = $request->template_id;
+        $contentVariables = $request->content_variables;
 
-            // Handle async response
-            if (isset($results['status']) && $results['status'] === 'queued') {
-                return ApiResponse::success([
-                    'queued' => true,
-                    'customer_count' => $results['customer_count'],
-                    'message' => $results['message'],
-                ], $results['message']);
+        // Validate that template_id and message are not both provided
+        if (!empty($templateId) && !empty($message)) {
+            return response()->json([
+                'message' => 'Cannot use both template_id and message. Please provide either template_id (for Content Template) or message (for plain text).',
+                'errors' => [
+                    'template_id' => ['Cannot use template with plain text message'],
+                    'message' => ['Cannot use plain text message with template'],
+                ],
+            ], 422);
+        }
+
+        // Validate that selected products match the product types (if provided)
+        if (!empty($productTypes)) {
+            $products = \App\Models\Product::whereIn('id', $productIds)->get();
+            $invalidProducts = $products->reject(function ($product) use ($productTypes) {
+                return in_array($product->product_type, $productTypes);
+            });
+
+            if ($invalidProducts->isNotEmpty()) {
+                return response()->json([
+                    'message' => 'Some selected products do not match the selected product types',
+                    'errors' => [
+                        'product_ids' => ['Selected products must match the selected product types'],
+                    ],
+                ], 422);
             }
+        }
 
-            // Handle synchronous response
-            $successCount = collect($results)->where('success', true)->count();
-            $failureCount = count($results) - $successCount;
+        // Send to all active customers
+        $results = $this->whatsAppService->sendPriceListToCustomers(
+            null, // null means all active customers
+            $message,
+            $includePdf,
+            $productIds,
+            $templateId,
+            $contentVariables
+        );
 
-            return ApiResponse::success([
+        $successCount = collect($results)->where('success', true)->count();
+        $failureCount = count($results) - $successCount;
+
+        return response()->json([
+            'message' => "WhatsApp update sent to {$successCount} customer(s), {$failureCount} failed",
+            'data' => [
                 'total' => count($results),
                 'successful' => $successCount,
                 'failed' => $failureCount,
                 'results' => $results,
-            ], "WhatsApp update sent to {$successCount} customer(s), {$failureCount} failed");
-        } catch (ValidationException $e) {
-            return ApiResponse::validationError($e->getErrors(), $e->getMessage());
-        } catch (BusinessException $e) {
-            return ApiResponse::error($e->getMessage(), null, 400);
-        } catch (\Exception $e) {
-            return ApiResponse::error(
-                'Failed to send WhatsApp update. Please try again later.',
-                null,
-                500
-            );
-        }
+            ],
+        ], 200);
     }
 
-    public function sendTestMessage(SendTestMessageRequest $request, Customer $customer): JsonResponse
+    /**
+     * Send test message to a single customer.
+     */
+    public function sendTestMessage(Request $request, Customer $customer): JsonResponse
     {
-        try {
-            $message = $request->input('message', 'Hello {{name}}, this is a test message from Grocery Management System.');
+        $request->validate([
+            'message' => ['nullable', 'string', 'max:1000'],
+        ]);
 
-            $result = $this->whatsAppService->sendMessage($customer, $message);
+        $message = $request->message ?? 'Hello {{name}}, this is a test message from Grocery Management System.';
 
-            return ApiResponse::success($result, 'Test message sent successfully');
-        } catch (ValidationException $e) {
-            return ApiResponse::validationError($e->getErrors(), $e->getMessage());
-        } catch (ModelNotFoundException $e) {
-            return ApiResponse::error('Customer not found', null, 404);
-        } catch (BusinessException $e) {
-            return ApiResponse::error($e->getMessage(), null, 400);
-        } catch (\Exception $e) {
-            return ApiResponse::error(
-                'Failed to send test message. Please try again later.',
-                null,
-                500
-            );
+        $result = $this->whatsAppService->sendMessage($customer, $message);
+
+        if (!$result['success']) {
+            return response()->json([
+                'message' => 'Failed to send message',
+                'error' => $result['error'],
+            ], 500);
         }
+
+        return response()->json([
+            'message' => 'Test message sent successfully',
+            'data' => $result,
+        ], 200);
     }
 
-    public function validateNumber(ValidateNumberRequest $request): JsonResponse
+    /**
+     * Validate WhatsApp number format.
+     */
+    public function validateNumber(Request $request): JsonResponse
     {
-        try {
-            $phoneNumber = $request->input('phone_number') ?? $request->input('whatsapp_number');
-            $isValid = $this->whatsAppService->validateWhatsAppNumber($phoneNumber);
+        $request->validate([
+            'phone_number' => ['required', 'string'],
+            'whatsapp_number' => ['sometimes', 'string'], // Alias for phone_number
+        ]);
 
-            return ApiResponse::success([
+        $phoneNumber = $request->phone_number ?? $request->whatsapp_number;
+        $isValid = $this->whatsAppService->validateWhatsAppNumber($phoneNumber);
+
+        return response()->json([
+            'data' => [
                 'valid' => $isValid,
                 'whatsapp_number' => $phoneNumber,
                 'formatted' => $isValid ? $phoneNumber : null,
-            ]);
-        } catch (\Exception $e) {
-            return ApiResponse::error(
-                'Failed to validate number. Please try again later.',
-                null,
-                500
-            );
-        }
+            ],
+        ], 200);
     }
 }
+
+

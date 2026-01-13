@@ -39,7 +39,6 @@ class SendProductUpdateRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'product_ids' => ['required', 'array', 'min:1'],
             'product_ids.*' => ['required', 'integer', 'exists:products,id'],
             'product_types' => ['sometimes', 'array'],
             'product_types.*' => ['required', 'string', 'in:daily,standard'],
