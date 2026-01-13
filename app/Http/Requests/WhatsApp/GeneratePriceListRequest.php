@@ -29,7 +29,6 @@ class GeneratePriceListRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'product_ids' => ['sometimes', 'array'],
             'product_ids.*' => ['required', 'integer', 'exists:products,id'],
             'pdf_layout' => ['sometimes', 'string', 'in:regular,catalog'],
         ];
