@@ -244,7 +244,7 @@
                 <td data-label="Quantity">
                     <div style="display: flex; gap: 5px; align-items: center;justify-content: center;" class="order-qty-box">
                         <input type="number" 
-                            step="1"
+                            step="0.1"
                             min="0" 
                             class="qty"
                             name="products[{{ $product->id }}][qty]"

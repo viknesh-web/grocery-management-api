@@ -109,7 +109,7 @@ class CartService
         }
         
         $productIds = array_keys($cart['items']);        
-        $products = $this->productRepository->findMany($productIds, ['category'])
+        $products = $this->productRepository->findMany($productIds, ['category','discounts'])
             ->where('status', 'active'); 
         
         return $products->map(function ($product) use ($cart) {

@@ -72,7 +72,7 @@ class OrderController extends Controller
 
             $order->load([
                 'customer:id,name,whatsapp_number,email,address',
-                'items.product:id,name,item_code,image',
+                'items.product:id,name,item_code,image,regular_price',
             ]);
 
 

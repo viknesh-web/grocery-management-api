@@ -34,7 +34,7 @@ class OrderService
  
     public function getFormData(): array
     {
-        $products = $this->productRepository->getActive(['category']);
+        $products = $this->productRepository->getActive(['category', 'discounts']);
         $categories = $this->categoryRepository->all([], [])
             ->sortBy('name')
             ->values();
@@ -63,7 +63,7 @@ class OrderService
         }
 
         $productIds = array_keys($cartItems);
-        $validProducts = $this->productRepository->findMany($productIds, ['category'])
+        $validProducts = $this->productRepository->findMany($productIds, ['category', 'discounts'])
             ->where('status', 'active');
 
         if ($validProducts->count() !== count($productIds)) {
@@ -180,27 +180,19 @@ class OrderService
             throw $e;
         }
     }
-
+ 
     private function createOrderItemDTOs(Collection $products): Collection
     {
         return $products->map(function ($product) {
             $quantity = $product->cart_qty ?? $product->qty ?? 0;
-            $unit = $product->cart_unit ?? $product->stock_unit;            
-            $price = $this->priceCalculator->getEffectivePrice($product);
-            $subtotal = $this->priceCalculator->calculatePriceWithUnit($product, $quantity, $unit);
-            $discountAmount = $this->priceCalculator->getDiscountAmount($product) * $quantity;
+            $unit = $product->cart_unit ?? $product->stock_unit;
             
-            return new OrderItemDTO(
-                productId: $product->id,
-                productName: $product->name,
-                productCode: $product->item_code,
-                price: $price,
+            // ✓ Use the static fromProduct() method which handles discount logic
+            return OrderItemDTO::fromProduct(
+                product: $product,
                 quantity: $quantity,
                 unit: $unit,
-                subtotal: $subtotal,
-                discountAmount: $discountAmount,
-                total: $subtotal,
-                productImageUrl: $product->image_url ?? null,
+                calculator: $this->priceCalculator
             );
         });
     }

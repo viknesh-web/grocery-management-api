@@ -109,7 +109,6 @@ class UpdateCustomerRequest extends FormRequest
                 'string',
                 'email',
                 'max:255',
-                Rule::unique('customers', 'email')->ignore($customerId),
             ],
             'landmark' => ['nullable', 'string', 'max:255'],
             'remarks' => ['nullable', 'string', 'max:1000'],

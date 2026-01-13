@@ -26,7 +26,7 @@
                 </div>
             </td>
 
-                <td style="border:none;text-align:right;vertical-align:middle;">
+            <td style="border:none;text-align:right;vertical-align:middle;">
                 <img src="{{ public_path('assets/images/logo-xion.png') }}" width="120">
             </td>
         </tr>
@@ -49,23 +49,33 @@
             @php $grandTotal = 0; @endphp
             @foreach($products as $item)
             @php
-
                 $imagePath = null;
 
                 if (!empty($item->image_url)) {
                     $relativePath = str_replace(url('/media').'/', '', $item->image_url);
                     $imagePath = Storage::disk('media')->path($relativePath);
                 }
+
+                // FIXED: Use cart_qty and cart_unit if available, otherwise fall back to qty/stock_unit
+                $qty = $item->cart_qty ?? $item->qty ?? 0;
+                $unit = $item->cart_unit ?? $item->stock_unit;
+
+                // FIXED: Use selling_price for effective price (already includes discount)
                 $price = ($item->selling_price > 0 && $item->selling_price < $item->regular_price)
-                ? $item->selling_price
-                : $item->regular_price;
-                $rowTotal = $price * $item->qty;
+                    ? $item->selling_price
+                    : $item->regular_price;
+
+                // FIXED: Use cart_subtotal if available (handles unit conversion properly)
+                // Otherwise calculate manually
+                $rowTotal = $item->cart_subtotal ?? ($price * $qty);
+                
                 $grandTotal += $rowTotal;
-                @endphp
+            @endphp
                 <tr>
                     <td>{{ $loop->iteration }}</td>
                     <td>{{ $item->name }}</td>
-                    <td>@if(file_exists($imagePath))
+                    <td>
+                        @if($imagePath && file_exists($imagePath))
                             <img src="{{ $imagePath }}" width="60">
                         @else
                             <span>No Image</span>
@@ -74,21 +84,38 @@
                     <td>{{ $item->item_code }}</td>
                     <td>
                         @if($item->selling_price > 0 && $item->selling_price < $item->regular_price)
-                            <div class="old-price"><img src="file://{{ public_path('assets/images/Dirham-Symbol-grey.png') }}" width="10"> {{ number_format($item->regular_price,2) }} / {{ $item->stock_unit }}</div>
-                            <div class="new-price"><img src="file://{{ public_path('assets/images/Dirham-Symbol.png') }}" width="10"> {{ number_format($item->selling_price,2) }} / {{ $item->stock_unit }}</div>
-                            @else
-                            <div class="new-price"><img src="file://{{ public_path('assets/images/Dirham-Symbol.png') }}" width="10"> {{ number_format($item->regular_price,2) }} / {{ $item->stock_unit }}</div>
+                            <div class="old-price">
+                                <img src="file://{{ public_path('assets/images/Dirham-Symbol-grey.png') }}" width="10"> 
+                                {{ number_format($item->regular_price, 2) }} / {{ $item->stock_unit }}
+                            </div>
+                            <div class="new-price">
+                                <img src="file://{{ public_path('assets/images/Dirham-Symbol.png') }}" width="10"> 
+                                {{ number_format($item->selling_price, 2) }} / {{ $item->stock_unit }}
+                            </div>
+                        @else
+                            <div class="new-price">
+                                <img src="file://{{ public_path('assets/images/Dirham-Symbol.png') }}" width="10"> 
+                                {{ number_format($item->regular_price, 2) }} / {{ $item->stock_unit }}
+                            </div>
                         @endif
                     </td>
-                    <td>{{ $item->qty }}</td>
-                    <td><img src="file://{{ public_path('assets/images/Dirham-Symbol-grey.png') }}" width="10"> {{ number_format($rowTotal,2) }}</td>
+                    <td>{{ $qty }} {{ $unit }}</td>
+                    <td>
+                        <img src="file://{{ public_path('assets/images/Dirham-Symbol-grey.png') }}" width="10"> 
+                        {{ number_format($rowTotal, 2) }}
+                    </td>
                 </tr>
-                @endforeach
+            @endforeach
         </tbody>
         <tfoot>
             <tr class="grand-total">
                 <td colspan="6" align="right"><strong>Grand Total</strong></td>
-                <td class="grand-total-price"><strong><img src="file://{{ public_path('assets/images/Dirham-Symbol-grey.png') }}" width="10"> {{ number_format($grandTotal,2) }}</strong></td>
+                <td class="grand-total-price">
+                    <strong>
+                        <img src="file://{{ public_path('assets/images/Dirham-Symbol-grey.png') }}" width="10"> 
+                        {{ number_format($grandTotal, 2) }}
+                    </strong>
+                </td>
             </tr>
         </tfoot>
     </table>

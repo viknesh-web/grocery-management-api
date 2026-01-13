@@ -4,6 +4,7 @@ namespace App\DTOs;
 
 use App\Models\Product;
 use App\Services\PriceCalculator;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Order Item Data Transfer Object
@@ -22,6 +23,8 @@ class OrderItemDTO
         public readonly float $discountAmount,
         public readonly float $total,
         public readonly ?string $productImageUrl = null,
+        public readonly ?string $discountType = null,     
+        public readonly ?float $discountValue = null,     
     ) {}
     
      public static function fromProduct(
@@ -37,6 +40,22 @@ class OrderItemDTO
         $subtotal = $calculator->calculatePriceWithUnit($product, $quantity, $unit);
         $discountAmount = $calculator->getDiscountAmount($product) * $quantity;
         $total = $subtotal;
+        if (!$product->relationLoaded('discounts')) {
+            $product->load('discounts');
+        }
+        
+        $activeDiscount = $product->activeDiscount();
+        Log::debug('OrderItemDTO: Processing product discount', [
+            'product_id' => $product->id,
+            'product_name' => $product->name,
+            'active_discount_found' => $activeDiscount !== null,
+            'discount_type' => $activeDiscount?->discount_type,
+            'discount_value' => $activeDiscount?->discount_value,
+            'discount_amount' => $discountAmount,
+        ]);
+        
+        $discountType = $activeDiscount?->discount_type;
+        $discountValue = $activeDiscount?->discount_value;
         
         return new self(
             productId: $product->id,
@@ -48,6 +67,8 @@ class OrderItemDTO
             subtotal: $subtotal,
             discountAmount: $discountAmount,
             total: $total,
+            discountType: $discountType,      
+            discountValue: $discountValue, 
             productImageUrl: $product->image_url,
         );
     }
@@ -64,6 +85,8 @@ class OrderItemDTO
             subtotal: (float) $data['subtotal'],
             discountAmount: (float) ($data['discount_amount'] ?? 0),
             total: (float) $data['total'],
+            discountType: $data['discount_type'] ?? null,    
+            discountValue: isset($data['discount_value']) ? (float) $data['discount_value'] : null,
             productImageUrl: $data['product_image_url'] ?? null,
         );
     }
@@ -81,6 +104,8 @@ class OrderItemDTO
             'unit' => $this->unit,
             'price' => $this->price,
             'discount_amount' => $this->discountAmount,
+            'discount_type' => $this->discountType,    
+            'discount_value' => $this->discountValue,
             'subtotal' => $this->subtotal,
             'total' => $this->total,
         ];
@@ -103,6 +128,8 @@ class OrderItemDTO
             'unit' => $this->unit,
             'subtotal' => $this->subtotal,
             'discount_amount' => $this->discountAmount,
+            'discount_type' => $this->discountType,     
+            'discount_value' => $this->discountValue,
             'total' => $this->total,
         ];
     }
@@ -130,6 +157,14 @@ class OrderItemDTO
         
         if (empty($this->unit)) {
             $errors[] = 'Unit is required';
+        }
+
+        if ($this->discountType && !in_array($this->discountType, ['percentage', 'fixed'])) {
+            $errors[] = 'Invalid discount type';
+        }
+        
+        if ($this->discountType && $this->discountValue === null) {
+            $errors[] = 'Discount value required when discount type is set';
         }
         
         return [
