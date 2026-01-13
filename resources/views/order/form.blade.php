@@ -7,6 +7,7 @@
         window.IS_ADMIN = @json($isAdmin ?? false);
         window.CUSTOMERS = @json($customers ?? []);
         window.PRODUCT_MIN_QTY = @json($productMinQuantities ?? []);
+        window.SELECTED_CUSTOMER_ID = @json($selectedCustomerId ?? null);
     </script>
   
 </head>
@@ -30,6 +31,7 @@
                             data-name="{{ $customer['name'] }}"
                             data-phone="{{ $customer['phone'] }}"
                             data-address="{{ $customer['address'] }}"
+                            {{ ($selectedCustomerId && $selectedCustomerId == $customer['id']) ? 'selected' : '' }}
                         >
                             {{ $customer['name'] }} ({{ $customer['phone'] }})
                         </option>
@@ -37,7 +39,7 @@
                     </select>                   
                 </div>
                 
-                <div id="customerInfoDisplay" class="customer-info-display">
+                <div id="customerInfoDisplay" class="customer-info-display {{ $selectedCustomerId ? 'active' : '' }}">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                         <h4 style="margin: 0; font-size: 14px; color: #1e293b;">Selected Customer</h4>
                         <button type="button" class="clear-customer-btn" onclick="clearCustomerSelection()">Clear</button>
@@ -111,7 +113,7 @@
             @if($isAdmin)
                 <input type="hidden" name="is_admin" value="1">
                 <input type="hidden" name="admin_user_id" value="{{ $adminUser?->id ?? '' }}">
-                <input type="hidden" name="selected_customer_id" id="hiddenCustomerId" value="">
+                <input type="hidden" name="selected_customer_id" id="hiddenCustomerId" value="{{ $selectedCustomerId ?? '' }}">
             @endif
             
             <!-- Product Tables -->
@@ -281,23 +283,40 @@
         const customerInfoDisplay = document.getElementById('customerInfoDisplay');
         const hiddenCustomerId = document.getElementById('hiddenCustomerId');
         
+        // Function to update customer display
+        function updateCustomerDisplay(option) {
+            if (option && option.value) {
+                document.getElementById('displayName').textContent = option.dataset.name || '—';
+                document.getElementById('displayPhone').textContent = option.dataset.phone || '—';
+                document.getElementById('displayAddress').textContent = option.dataset.address || '—';
+                customerInfoDisplay.classList.add('active');
+            } else {
+                customerInfoDisplay.classList.remove('active');
+            }
+        }
+        
+        // Restore customer selection on page load if coming from review
+        if (window.SELECTED_CUSTOMER_ID) {
+            const selectedOption = customerSelect.options[customerSelect.selectedIndex];
+            updateCustomerDisplay(selectedOption);
+            
+            console.log('Restored customer selection:', {
+                customerId: window.SELECTED_CUSTOMER_ID,
+                name: selectedOption.dataset.name
+            });
+        }
+        
         // Update customer info display when selection changes
         customerSelect.addEventListener('change', function() {
             const selectedOption = this.options[this.selectedIndex];
             const customerId = selectedOption.value;
             
             if (customerId) {
-                // Show customer info
-                document.getElementById('displayName').textContent = selectedOption.dataset.name || '—';
-                document.getElementById('displayPhone').textContent = selectedOption.dataset.phone || '—';
-                document.getElementById('displayAddress').textContent = selectedOption.dataset.address || '—';
-                
-                customerInfoDisplay.classList.add('active');
+                updateCustomerDisplay(selectedOption);
                 hiddenCustomerId.value = customerId;
                 
                 console.log('Customer selected:', customerId);
             } else {
-                // Hide customer info
                 customerInfoDisplay.classList.remove('active');
                 hiddenCustomerId.value = '';
                 

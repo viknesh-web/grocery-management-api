@@ -142,7 +142,7 @@
         
         <!-- Actions -->
         <div class="actions">
-            <a href="{{ route('order.form', ['from' => 'review']) }}" class="btn btn-back">
+            <a href="{{ $back_to_products_url ?? route('order.form', ['from' => 'review']) }}" class="btn btn-back">
                 ← Back to Products
             </a>
             

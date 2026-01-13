@@ -63,6 +63,7 @@ class OrderController extends Controller
             $signature = $request->get('signature');
             $adminUser = null;
             $customers = [];
+            $selectedCustomerId = null;
             
             if ($isAdmin && $adminUserId && $signature) {
                 // Validate signed URL
@@ -86,10 +87,21 @@ class OrderController extends Controller
                                 ];
                             });
                         
+                        // Restore selected customer from session if coming back from review
+                        if ($this->orderService->isFromReview($request->get('from'))) {
+                            $selectedCustomerId = session('selected_customer_id');
+                            
+                            Log::info('Restoring selected customer from session', [
+                                'admin_id' => $adminUser->id,
+                                'selected_customer_id' => $selectedCustomerId,
+                            ]);
+                        }
+                        
                         Log::info('Admin order creation initiated (signed URL)', [
                             'admin_id' => $adminUser->id,
                             'admin_email' => $adminUser->email,
                             'customers_count' => $customers->count(),
+                            'selected_customer_id' => $selectedCustomerId,
                         ]);
                     } else {
                         $isAdmin = false;
@@ -112,6 +124,7 @@ class OrderController extends Controller
                 'adminUserId' => $adminUserId,
                 'adminUser' => $adminUser,
                 'customers' => $customers,
+                'selectedCustomerId' => $selectedCustomerId,
             ]));
             
         } catch (\Exception $e) {
@@ -192,14 +205,45 @@ class OrderController extends Controller
             $selectedCustomerId = session('selected_customer_id');
             
             $selectedCustomer = null;
+            $backToProductsUrl = route('order.form', ['from' => 'review']);
             
-            if ($isAdmin && $selectedCustomerId) {
-                $selectedCustomer = $this->customerRepository->find((int) $selectedCustomerId);
+            if ($isAdmin && $adminUserId) {
+                // Validate admin user exists
+                $adminUser = User::find((int) $adminUserId);
                 
-                Log::info('Loading selected customer for admin order', [
-                    'customer_id' => $selectedCustomerId,
-                    'customer_found' => $selectedCustomer ? true : false,
-                ]);
+                if ($adminUser && $adminUser->master) {
+                    // Generate new signed URL for "Back to Products"
+                    $backToProductsUrl = URL::temporarySignedRoute(
+                        'order.form',
+                        now()->addHour(),
+                        [
+                            'is_admin' => 1,
+                            'admin_user_id' => $adminUser->id,
+                            'from' => 'review',
+                        ]
+                    );
+                    
+                    if ($selectedCustomerId) {
+                        $selectedCustomer = $this->customerRepository->find((int) $selectedCustomerId);
+                        
+                        Log::info('Loading selected customer for admin order', [
+                            'customer_id' => $selectedCustomerId,
+                            'customer_found' => $selectedCustomer ? true : false,
+                        ]);
+                    }
+                    
+                    Log::info('Generated back to products URL for admin', [
+                        'admin_id' => $adminUser->id,
+                    ]);
+                } else {
+                    // Invalid admin user, clear admin session
+                    $isAdmin = false;
+                    session()->forget(['admin_order', 'admin_user_id', 'selected_customer_id']);
+                    
+                    Log::warning('Admin user invalid in review, clearing session', [
+                        'admin_user_id' => $adminUserId,
+                    ]);
+                }
             }
             
             return view('order.review', [
@@ -207,6 +251,7 @@ class OrderController extends Controller
                 'is_admin' => $isAdmin,
                 'admin_user_id' => $adminUserId,
                 'selected_customer' => $selectedCustomer,
+                'back_to_products_url' => $backToProductsUrl,
             ]);
             
         } catch (ValidationException $e) {
