@@ -4,28 +4,13 @@ namespace App\Http\Requests\WhatsApp;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-/**
- * Validate Number Request
- * 
- * Validates request for validating WhatsApp numbers.
- */
 class ValidateNumberRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     *
-     * @return bool
-     */
     public function authorize(): bool
     {
         return true;
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
-     */
     public function rules(): array
     {
         return [
@@ -33,5 +18,26 @@ class ValidateNumberRequest extends FormRequest
             'whatsapp_number' => ['sometimes', 'string'],
         ];
     }
-}
 
+    public function messages(): array
+    {
+        return [
+            'phone_number.required' => 'Phone number is required',
+        ];
+    }
+
+    /**
+     * Get validated phone number (supports both field names).
+     */
+    public function validated($key = null, $default = null)
+    {
+        $validated = parent::validated();
+        
+        // Use whatsapp_number if provided, otherwise use phone_number
+        $phoneNumber = $validated['whatsapp_number'] ?? $validated['phone_number'];
+        
+        return [
+            'phone_number' => $phoneNumber,
+        ];
+    }
+}
