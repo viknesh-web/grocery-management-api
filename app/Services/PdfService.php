@@ -20,7 +20,7 @@ class PdfService
         private ProductRepository $productRepository
     ) {}
 
-    public function generatePriceList(array $productIds = [], string $pdfLayout = 'regular'): string
+    public function generatePriceList(array $productIds = [], ?string $pdfLayout): string
     {
         $cacheKey = CacheService::priceListKey($productIds, $pdfLayout);
         $cachedPath = Cache::get($cacheKey);

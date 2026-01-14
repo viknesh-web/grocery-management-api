@@ -48,10 +48,10 @@ class WhatsAppService extends BaseService
     /**
      * Generate price list PDF.
      */
-    public function generatePriceList(array $productIds = []): array
+    public function generatePriceList(array $productIds = [], ?string $pdfLayout = 'regular'): array
     {
-        return $this->handle(function () use ($productIds) {
-            $pdfPath = $this->pdfService->generatePriceList($productIds);
+        return $this->handle(function () use ($productIds, $pdfLayout) {
+            $pdfPath = $this->pdfService->generatePriceList($productIds, $pdfLayout);
             $pdfUrl = $this->pdfService->getPdfUrl($pdfPath);
 
             return [
@@ -75,13 +75,19 @@ class WhatsAppService extends BaseService
             $templateId = $data['template_id'] ?? null;
             $contentVariables = $data['content_variables'] ?? null;
             $pdfType = $data['pdf_type'] ?? 'regular';
-            $customPdfUrl = $data['custom_pdf_url'] ?? null;
+            $pdfLayout = $data['pdf_layout'] ?? 'regular';
+            $customPdfUrl = null;
+
+            // Handle custom PDF upload using PdfService
+            if ($pdfType === 'custom' && isset($data['custom_pdf_file'])) {
+                $customPdfUrl = $this->pdfService->uploadCustomPdf($data['custom_pdf_file']);
+            }
 
             // Validate template usage
             $this->validateTemplateUsage($templateId, $message);
 
             // Generate or handle PDF
-            $pdfUrl = $this->preparePdfUrl($includePdf, $pdfType, $customPdfUrl, $productIds);
+            $pdfUrl = $this->preparePdfUrl($includePdf, $pdfType, $customPdfUrl, $productIds, $pdfLayout);
 
             // Get customers
             $customers = $this->getCustomers($customerIds, $sendToAll);
@@ -111,6 +117,7 @@ class WhatsAppService extends BaseService
             $includePdf = $data['include_pdf'] ?? true;
             $templateId = $data['template_id'] ?? null;
             $contentVariables = $data['content_variables'] ?? null;
+            $pdfLayout = $data['pdf_layout'] ?? 'regular';
 
             // Validate template usage
             $this->validateTemplateUsage($templateId, $message);
@@ -123,7 +130,7 @@ class WhatsAppService extends BaseService
             // Generate PDF if needed
             $pdfUrl = null;
             if ($includePdf && !empty($productIds)) {
-                $pdfPath = $this->pdfService->generatePriceList($productIds);
+                $pdfPath = $this->pdfService->generatePriceList($productIds, $pdfLayout);
                 $pdfUrl = $this->pdfService->getPdfUrl($pdfPath);
             }
 
@@ -221,7 +228,7 @@ class WhatsAppService extends BaseService
     /**
      * Prepare PDF URL based on type.
      */
-    private function preparePdfUrl(bool $includePdf, string $pdfType, ?string $customPdfUrl, ?array $productIds): ?string
+    private function preparePdfUrl(bool $includePdf, string $pdfType, ?string $customPdfUrl, ?array $productIds, ?string $pdfLayout): ?string
     {
         if (!$includePdf) {
             return null;
@@ -232,7 +239,7 @@ class WhatsAppService extends BaseService
         }
 
         if (!empty($productIds)) {
-            $pdfPath = $this->pdfService->generatePriceList($productIds);
+            $pdfPath = $this->pdfService->generatePriceList($productIds, $pdfLayout ?? 'regular');
             return $this->pdfService->getPdfUrl($pdfPath);
         }
 
@@ -311,6 +318,7 @@ class WhatsAppService extends BaseService
                 'has_pdf' => !empty($pdfUrl),
             ]);
 
+            print_r("Sending WhatsApp message to {$pdfUrl}\n");
             // Build message data
             $messageData = $this->buildMessageData($message, $pdfUrl, $templateId, $contentVariables, $customer);
 
@@ -469,10 +477,8 @@ class WhatsAppService extends BaseService
      */
     private function validateWhatsAppNumber(string $number): bool
     {
-        // Remove any non-digit characters except +
         $cleaned = preg_replace('/[^\d+]/', '', $number);
 
-        // Check if it starts with + and has valid format
         return preg_match('/^\+[1-9]\d{1,14}$/', $cleaned) === 1;
     }
 

@@ -12,6 +12,7 @@ use App\Services\WhatsAppService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -47,7 +48,13 @@ class WhatsAppController extends Controller
     public function sendMessage(SendMessageRequest $request): JsonResponse
     {
         try {
-            $data = $request->validated();
+            $data = $request->validated();            
+           
+            
+            // Add custom PDF file if present
+            if ($request->hasFile('custom_pdf')) {
+                $data['custom_pdf_file'] = $request->file('custom_pdf');
+            }
             
             $result = $this->whatsAppService->sendMessageToCustomers($data);
             
@@ -59,10 +66,19 @@ class WhatsAppController extends Controller
                 "Sent to {$successCount} customer(s), {$failureCount} failed"
             );
         } catch (ValidationException $e) {
+            Log::error('WhatsApp validation error', [
+                'errors' => $e->errors(),
+                'pdf_type' => $request->get('pdf_type'),
+                'has_file' => $request->hasFile('custom_pdf'),
+            ]);
             return ApiResponse::validationError($e->errors());
         } catch (BusinessException $e) {
             return ApiResponse::error($e->getMessage(), null, 422);
         } catch (\Exception $e) {
+            Log::error('WhatsApp send message failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             return ApiResponse::error('Failed to send WhatsApp messages', null, 500);
         }
     }
