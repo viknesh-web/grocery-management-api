@@ -18,9 +18,9 @@ return new class extends Migration
             $table->decimal('quantity', 10, 2)->unsigned();
             $table->string('unit', 50)->default('kg');
             $table->decimal('price', 10, 2)->unsigned();
-            $table->enum('discount_type', ['none', 'percentage', 'fixed'])->default('none');
-            $table->decimal('discount_value', 10, 2)->default(0)->unsigned();
-            $table->decimal('discount_amount', 10, 2)->default(0)->unsigned();
+            $table->enum('discount_type', ['none', 'percentage', 'fixed'])->default('none')->nullable();
+            $table->decimal('discount_value', 10, 2)->default(0)->unsigned()->nullable();
+            $table->decimal('discount_amount', 10, 2)->default(0)->unsigned()->nullable();
             $table->decimal('subtotal', 10, 2)->unsigned();
             $table->decimal('total', 10, 2)->unsigned();
             $table->timestamps();

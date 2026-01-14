@@ -120,7 +120,7 @@ $generatedAt = Carbon::now();
         .new-price {
             font-weight: bold;
             color: #0a8a0a;
-            font-size: 8px;
+            font-size: 11px;
             white-space: nowrap;
             padding: 0px 0px;
         }
@@ -225,7 +225,7 @@ $generatedAt = Carbon::now();
                 <table class="content-table">
                     <thead>
                         <tr>
-                            <th class="col-product">Product</th>
+                            <th class="col-product">Products</th>
                             <th class="col-image">Image</th>
                             <th class="col-code">Code</th>
                             <th class="col-price">Price</th>
@@ -270,7 +270,7 @@ $generatedAt = Carbon::now();
                 <table class="content-table">
                     <thead>
                         <tr>
-                            <th class="col-product">Product</th>
+                            <th class="col-product">Products</th>
                             <th class="col-image">Image</th>
                             <th class="col-code">Code</th>
                             <th class="col-price">Price</th>

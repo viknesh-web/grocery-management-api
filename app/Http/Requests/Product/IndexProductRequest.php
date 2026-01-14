@@ -10,6 +10,15 @@ class IndexProductRequest extends FormRequest
     {
         return true;
     }
+    
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('product_type') && !is_array($this->product_type)) {
+            $this->merge([
+                'product_type' => [$this->product_type],
+            ]);
+        }
+    }
 
     public function rules(): array
     {
@@ -31,8 +40,9 @@ class IndexProductRequest extends FormRequest
             'category' => 'sometimes|integer|exists:categories,id',
             'category_id' => 'sometimes|integer|exists:categories,id',
             'status' => 'sometimes|string|in:active,inactive',
-            'product_type' => 'sometimes|string|in:standard,daily',
-            'has_discount' => 'sometimes|boolean',
+            'product_type' => 'sometimes|array',
+            'product_type.*' => 'string|in:standard,daily',
+            'has_discount' => 'sometimes|string|in:0,1,true,false',
             'stock_status' => 'sometimes|string|in:in_stock,low_stock,out_of_stock',
         ];
     }

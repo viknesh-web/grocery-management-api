@@ -123,11 +123,20 @@ class StoreProductRequest extends FormRequest
             'discount_start_date' => ['nullable', 'date'],
             'discount_end_date' => ['nullable', 'date', 'after_or_equal:discount_start_date'],
             'stock_quantity' => ['required', 'numeric', 'min:0', 'max:999999.99'],
-            'stock_unit' => ['required', Rule::in(['Kg', 'Pieces', 'Units', 'L'])],
+            'stock_unit' => ['required', Rule::in(['Kg', 'packet', 'gm', 'L'])],
             'status' => ['sometimes', 'string', Rule::in(['active', 'inactive'])],
             'min_quantity' => ['required', 'numeric', 'min:0'],
             'max_quantity' => ['numeric', 'min:0'],
             'product_type' => ['sometimes', Rule::in(['daily', 'standard'])],
+        ];
+    }
+
+     public function messages(): array
+    {
+        return [
+            'category_id.required' => 'Please select a category.',
+            'category_id.integer' => 'Please select a valid category.',
+            'category_id.exists' => 'The selected category is invalid.',
         ];
     }
 }
