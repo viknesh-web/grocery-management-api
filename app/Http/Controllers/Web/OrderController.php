@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Repositories\CustomerRepository;
 use App\Services\AddressService;
 use App\Services\CartService;
+use App\Services\NotificationService;
 use App\Services\OrderPdfService;
 use App\Services\OrderService;
 use App\Services\PriceCalculator;
@@ -22,6 +23,7 @@ use Illuminate\Support\Facades\URL;
 
 /**
  * Order Controller - Using Signed URLs (No Token Storage Required)
+ * Updated with Email Notification Support
  */
 class OrderController extends Controller
 {
@@ -31,7 +33,8 @@ class OrderController extends Controller
         private AddressService $addressService,
         private CartService $cartService,
         private PriceCalculator $priceCalculator,
-        private CustomerRepository $customerRepository
+        private CustomerRepository $customerRepository,
+        private NotificationService $notificationService
     ) {}
   
     public function index(Request $request)
@@ -377,13 +380,28 @@ class OrderController extends Controller
             
             $order = $this->orderService->createFromWebForm($orderData);
             
+            try {
+                $this->notificationService->sendOrderConfirmedToAdmin($order);
+                
+                Log::info('Order confirmation email queued', [
+                    'order_id' => $order->id,
+                    'order_number' => $order->order_number,
+                ]);
+            } catch (\Exception $e) {
+                // Log error but don't fail the order
+                Log::error('Failed to send order confirmation email', [
+                    'order_id' => $order->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+            
             // Save order ID and admin context to session for confirmation page
             $confirmationData = [
                 'order_id' => $order->id,
             ];
             
             // Preserve admin context for "Order Again" button
-            if ($isAdmin && $adminUser) {
+            if ($isAdmin && isset($adminUser)) {
                 $confirmationData['admin_user_id'] = $adminUser->id;
                 
                 Log::info('Preserving admin context for confirmation page', [

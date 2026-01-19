@@ -51,12 +51,7 @@ class ConfirmOrderRequest extends FormRequest
             'email' => ['nullable', 'email'],
             'address' => [
                 'required',
-                'min:2',
-                function ($attr, $value, $fail) {
-                    if (!str_contains(strtolower($value), 'dubai')) {
-                        $fail('Please select a valid Dubai address');
-                    }
-                }
+                'min:2',               
             ],
         ];
     }
